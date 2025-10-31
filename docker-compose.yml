@@ -1,0 +1,32 @@
+services:
+  smtp-relay:
+    build: .
+    container_name: smtp-relay-contpaq
+    restart: unless-stopped
+    ports:
+      - "587:587"
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs
+      - ./token_cache:/app/token_cache
+      - ./certs:/app/certs:ro  # Mount certificates directory (read-only)
+    environment:
+      - TZ=America/Mexico_City
+    networks:
+      - smtp-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.settimeout(5); s.connect(('localhost', 587)); s.close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  smtp-network:
+    driver: bridge

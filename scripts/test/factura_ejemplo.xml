@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cfdi:Comprobante xmlns:cfdi="http://www.sat.gob.mx/cfd/4" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" Certificado="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" Exportacion="01" Fecha="2025-10-27T18:27:00" Folio="712" FormaPago="99" LugarExpedicion="45010" MetodoPago="PPD" Moneda="MXN" NoCertificado="00001000000518612761" Serie="A" SubTotal="33333.33" TipoDeComprobante="I" Total="34694.42" Version="4.0" xsi:schemaLocation="http://www.sat.gob.mx/cfd/4 http://www.sat.gob.mx/sitio_internet/cfd/4/cfdv40.xsd" Sello="jgDfzur1KtqU1ttwY2xWFgebOt0BHjyv7gi21rovaJqT2TkEllzixro5bMM47mj/QB3GTX3TNBXQ4vMJuPia6ehb+9aH5ZA2eNLc6Oro3O+B2LL1CF6k2WzaH8MF1UiEN6Yl/n4D4m420fWNnhILpZCOEDrhd2ccAg4wYyM4XyGH7IjwzoG8o+36g/DbdIcJo/yenIev5YrmS2HfdW9pzYrHUZgOZkINC40qMk8PMzi7HWiwmVasNrj/RiMyab5aT9fLQ+cEcv0hYrffpviniAsZsV600NzPBDrYuLica2s9wr+9VY9b8rxWQOm58OI/h3ow17+cPVfdNR3wGtHVgA==">
+  <cfdi:Emisor Nombre="IRMA PATRICIA LARIOS CASILLAS" RegimenFiscal="626" Rfc="LACI740711H35" />
+  <cfdi:Receptor DomicilioFiscalReceptor="66600" Nombre="FABRICA DE HIELO APODACA" RegimenFiscalReceptor="601" Rfc="FHA160810R96" UsoCFDI="G03" />
+  <cfdi:Conceptos>
+    <cfdi:Concepto Cantidad="1.00" ClaveProdServ="01010101" ClaveUnidad="ACT" Descripcion="Asesoría Profesional para actualización y anexos licencia de giro instalaciones Constituyentes" Importe="33333.33" NoIdentificacion="002" ObjetoImp="02" Unidad="1" ValorUnitario="33333.33">
+      <cfdi:Impuestos>
+        <cfdi:Traslados>
+          <cfdi:Traslado Base="33333.33" Importe="5333.33" Impuesto="002" TasaOCuota="0.160000" TipoFactor="Tasa" />
+        </cfdi:Traslados>
+        <cfdi:Retenciones>
+          <cfdi:Retencion Base="33333.33" Importe="416.67" Impuesto="001" TasaOCuota="0.012500" TipoFactor="Tasa" />
+          <cfdi:Retencion Base="33333.33" Importe="3555.57" Impuesto="002" TasaOCuota="0.106667" TipoFactor="Tasa" />
+        </cfdi:Retenciones>
+      </cfdi:Impuestos>
+    </cfdi:Concepto>
+  </cfdi:Conceptos>
+  <cfdi:Impuestos TotalImpuestosRetenidos="3972.24" TotalImpuestosTrasladados="5333.33">
+    <cfdi:Retenciones>
+      <cfdi:Retencion Importe="3555.57" Impuesto="002" />
+      <cfdi:Retencion Importe="416.67" Impuesto="001" />
+    </cfdi:Retenciones>
+    <cfdi:Traslados>
+      <cfdi:Traslado Base="33333.33" Importe="5333.33" Impuesto="002" TasaOCuota="0.160000" TipoFactor="Tasa" />
+    </cfdi:Traslados>
+  </cfdi:Impuestos>
+  <cfdi:Complemento><tfd:TimbreFiscalDigital xmlns:tfd="http://www.sat.gob.mx/TimbreFiscalDigital" xsi:schemaLocation="http://www.sat.gob.mx/TimbreFiscalDigital http://www.sat.gob.mx/sitio_internet/cfd/TimbreFiscalDigital/TimbreFiscalDigitalv11.xsd" Version="1.1" UUID="CD50C672-4CDA-45D4-8C23-682CF5939D48" FechaTimbrado="2025-10-27T18:27:59" RfcProvCertif="SIF0403229F9" SelloCFD="jgDfzur1KtqU1ttwY2xWFgebOt0BHjyv7gi21rovaJqT2TkEllzixro5bMM47mj/QB3GTX3TNBXQ4vMJuPia6ehb+9aH5ZA2eNLc6Oro3O+B2LL1CF6k2WzaH8MF1UiEN6Yl/n4D4m420fWNnhILpZCOEDrhd2ccAg4wYyM4XyGH7IjwzoG8o+36g/DbdIcJo/yenIev5YrmS2HfdW9pzYrHUZgOZkINC40qMk8PMzi7HWiwmVasNrj/RiMyab5aT9fLQ+cEcv0hYrffpviniAsZsV600NzPBDrYuLica2s9wr+9VY9b8rxWQOm58OI/h3ow17+cPVfdNR3wGtHVgA==" NoCertificadoSAT="00001000000717964008" SelloSAT="Nh3UiYkXJOMDauX14GWReIcSuA6lgE6yyPxddg2GHZZHloXGU1D6jjwYGEDLE6oAfbyHnvXH1XH2645X/1yDBcVeL7j1S6JYUre3rrmcY50TE5TyyOk6m5eTDPp8CXtxHbkhVQzi5sDgx1bkJlNAZM7HYgvcrv2yvzEkE9pXHg5dVO4L2OtWbLRvw/PuTbG+t4+p/6SGzWkh38al5voRCmttYUDF+a+IBNzoSkObywssng1ATkpRKROSlolUU7dvyErYxlBBeNbJHXjrUOJQOSrbCEppkd2SuDHKrW4vbXUXmUj+3rbDMo5NNJk/GB4QxFYM4ot6fMfd9WeK9PIMZQ==" /></cfdi:Complemento>
+</cfdi:Comprobante>

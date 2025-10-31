@@ -1,0 +1,63 @@
+# Environment files
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Sensitive security files
+*.key
+*.crt
+*.pem
+certs/*.key
+certs/*.crt
+certs/*.pem
+*.backup
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environment
+venv/
+ENV/
+env/
+
+# Logs
+logs/
+*.log
+
+# Token cache
+token_cache/
+token_cache.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Docker
+docker-compose.override.yml
+
+# OS
+.DS_Store
+Thumbs.db

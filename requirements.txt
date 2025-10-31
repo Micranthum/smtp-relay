@@ -1,0 +1,12 @@
+# SMTP Server
+aiosmtpd==1.4.4.post2
+
+# Microsoft 365 OAuth2 and Graph API
+msal==1.26.0
+requests==2.31.0
+
+# Email handling
+python-dotenv==1.0.0
+
+# Logging
+colorlog==6.8.0
