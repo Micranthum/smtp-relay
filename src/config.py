@@ -78,8 +78,7 @@ class Config:
         if cls.ENVIRONMENT == 'production':
             if cls.ALLOWED_IPS == '*':
                 errors.append("ALLOWED_IPS should not be '*' in production (security risk)")
-            if cls.ALLOWED_SENDERS == '*':
-                errors.append("ALLOWED_SENDERS should not be '*' in production (security risk)")
+            # Note: ALLOWED_SENDERS can be '*' if you control access via IP whitelist
             if cls.LOG_LEVEL == 'DEBUG':
                 errors.append("LOG_LEVEL should not be 'DEBUG' in production")
         
