@@ -5,6 +5,7 @@ Bridges Contpaq (Basic Auth) with Microsoft 365 (OAuth2)
 import asyncio
 import signal
 import sys
+import ssl
 from .config import Config
 from .logger import logger
 from .relay import SMTPRelayHandler, AuthenticatedSMTPController
@@ -30,6 +31,20 @@ class SMTPRelayServer:
             logger.info(f"Sender Whitelist: {Config.ALLOWED_SENDERS}")
             logger.info(f"Rate Limit: {Config.RATE_LIMIT_PER_MINUTE} emails/minute")
             
+            # Create TLS context if enabled
+            tls_context = None
+            if Config.SMTP_RELAY_USE_TLS:
+                try:
+                    tls_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                    tls_context.load_cert_chain(
+                        certfile=Config.TLS_CERT_FILE,
+                        keyfile=Config.TLS_KEY_FILE
+                    )
+                    logger.info("✅ TLS context created successfully")
+                except Exception as e:
+                    logger.error(f"❌ Failed to create TLS context: {e}")
+                    raise
+            
             # Create handler
             handler = SMTPRelayHandler()
             
@@ -38,6 +53,7 @@ class SMTPRelayServer:
                 handler,
                 hostname=Config.SMTP_RELAY_HOST,
                 port=Config.SMTP_RELAY_PORT,
+                tls_context=tls_context,
             )
             
             # Start server
