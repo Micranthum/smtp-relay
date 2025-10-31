@@ -153,12 +153,11 @@ class SMTPRelayHandler:
         
         # Extract headers
         subject = msg.get('Subject', 'No Subject')
-        from_addr = msg.get('From', Config.MS365_EMAIL_ADDRESS)
         
-        # Parse from address
-        from_name, from_email = parseaddr(from_addr)
-        if not from_email:
-            from_email = Config.MS365_EMAIL_ADDRESS
+        # Always use the configured MS365 email address as sender
+        # Ignore the MAIL FROM from the client (which is just the SMTP auth user)
+        from_email = Config.MS365_EMAIL_ADDRESS
+        from_name = Config.MS365_EMAIL_ADDRESS.split('@')[0]
         
         # Build recipient list
         to_recipients = []
