@@ -39,13 +39,30 @@ fi
 echo "Todas las variables de entorno están configuradas"
 echo ""
 
-# Crear directorios necesarios (con permisos correctos para el usuario actual)
-mkdir -p /app/logs 2>/dev/null || true
-mkdir -p /app/token_cache 2>/dev/null || true
+# Crear directorios necesarios y asignar permisos correctos
+echo "Creating directories with proper permissions..."
+mkdir -p /app/logs /app/token_cache
 
-echo "✅ Directorios creados"
+# Asignar permisos de escritura (funciona incluso con volúmenes montados)
+chmod 755 /app/logs /app/token_cache 2>/dev/null || true
+
+# Intentar crear un archivo de prueba para verificar permisos
+if ! touch /app/logs/.test 2>/dev/null; then
+    echo "WARNING: Cannot write to /app/logs - attempting to fix permissions..."
+    # Si no podemos escribir, intentar con permisos más amplios
+    chmod 777 /app/logs 2>/dev/null || true
+fi
+rm -f /app/logs/.test 2>/dev/null || true
+
+if ! touch /app/token_cache/.test 2>/dev/null; then
+    echo "WARNING: Cannot write to /app/token_cache - attempting to fix permissions..."
+    chmod 777 /app/token_cache 2>/dev/null || true
+fi
+rm -f /app/token_cache/.test 2>/dev/null || true
+
+echo "Directories ready"
 echo ""
-echo "Iniciando servidor SMTP Relay..."
+echo "Starting SMTP Relay server..."
 echo ""
 
 # Ejecutar la aplicación como módulo
