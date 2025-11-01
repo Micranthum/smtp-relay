@@ -5,7 +5,7 @@ aiosmtpd==1.4.4.post2
 msal==1.26.0
 requests==2.31.0
 
-# Email handling
+# Environment Variable Management
 python-dotenv==1.0.0
 
 # Logging

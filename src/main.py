@@ -39,9 +39,9 @@ class SMTPRelayServer:
                     certfile=Config.TLS_CERT_FILE,
                     keyfile=Config.TLS_KEY_FILE
                 )
-                logger.info("✅ TLS context created successfully")
+                logger.info("Success: TLS context created successfully")
             except Exception as e:
-                logger.error(f"❌ Failed to create TLS context: {e}")
+                logger.error(f"Error: Failed to create TLS context: {e}")
                 raise
             
             # Create handlers for both servers
@@ -70,16 +70,16 @@ class SMTPRelayServer:
             # Start servers
             logger.info("=" * 70)
             logger.info(f"Starting SMTP Relay Servers:")
-            logger.info(f"  📬 STARTTLS on {Config.SMTP_RELAY_HOST}:{Config.SMTP_STARTTLS_PORT}")
-            logger.info(f"  🔒 SSL/TLS on {Config.SMTP_RELAY_HOST}:{Config.SMTP_SSL_PORT}")
+            logger.info(f"STARTTLS on {Config.SMTP_RELAY_HOST}:{Config.SMTP_STARTTLS_PORT}")
+            logger.info(f"SSL/TLS on {Config.SMTP_RELAY_HOST}:{Config.SMTP_SSL_PORT}")
             logger.info(f"Relay target: Microsoft Graph API")
             logger.info(f"Using email address: {Config.MS365_EMAIL_ADDRESS}")
             logger.info("=" * 70)
             
             self.controller_starttls.start()
             self.controller_ssl.start()
-            
-            logger.info("✅ Both SMTP servers started successfully")
+
+            logger.info("Success: Both SMTP servers started")
             logger.info("Ready to accept connections:")
             logger.info("  - Modern clients: use port 587 with STARTTLS")
             logger.info("  - Legacy clients: use port 465 with SSL/TLS")

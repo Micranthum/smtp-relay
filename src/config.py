@@ -17,10 +17,10 @@ class Config:
     # SMTP Relay Server Configuration
     SMTP_RELAY_HOST = os.getenv('SMTP_RELAY_HOST', '0.0.0.0')
     
-    # Dual server setup: STARTTLS on 587 and SSL on 465
-    SMTP_STARTTLS_PORT = 587  # Modern clients
-    SMTP_SSL_PORT = 465        # Legacy clients
-    
+    # Dual server setup
+    SMTP_STARTTLS_PORT = os.getenv('SMTP_STARTTLS_PORT', 587)
+    SMTP_SSL_PORT = os.getenv('SMTP_SSL_PORT', 465) 
+
     # TLS/SSL Certificate Configuration (optional, for production)
     TLS_CERT_FILE = os.getenv('TLS_CERT_FILE', '')  # Path to certificate file
     TLS_KEY_FILE = os.getenv('TLS_KEY_FILE', '')    # Path to private key file
@@ -29,14 +29,10 @@ class Config:
     SMTP_RELAY_USERNAME = os.getenv('SMTP_RELAY_USERNAME', '')
     SMTP_RELAY_PASSWORD = os.getenv('SMTP_RELAY_PASSWORD', '')
     
-    # Microsoft 365 SMTP Configuration (legacy, not used with Graph API)
-    MS365_SMTP_HOST = os.getenv('MS365_SMTP_HOST', 'smtp.office365.com')
-    MS365_SMTP_PORT = int(os.getenv('MS365_SMTP_PORT', '587'))
-    
-    # Microsoft 365 OAuth2 Configuration
-    MS365_TENANT_ID = os.getenv('MS365_TENANT_ID', '')
-    MS365_CLIENT_ID = os.getenv('MS365_CLIENT_ID', '')
-    MS365_CLIENT_SECRET = os.getenv('MS365_CLIENT_SECRET', '')
+    # Microsoft Graph API OAuth2 Configuration
+    MS365_TENANT_ID = os.getenv('TENANT_ID', '')
+    MS365_CLIENT_ID = os.getenv('CLIENT_ID', '')
+    MS365_CLIENT_SECRET = os.getenv('CLIENT_SECRET', '')
     MS365_EMAIL_ADDRESS = os.getenv('MS365_EMAIL_ADDRESS', '')
     
     # Security - IP Whitelist

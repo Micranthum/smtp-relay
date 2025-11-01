@@ -27,7 +27,7 @@ for var in "${REQUIRED_VARS[@]}"; do
 done
 
 if [ ${#MISSING_VARS[@]} -ne 0 ]; then
-    echo "❌ ERROR: Variables de entorno faltantes:"
+    echo "ERROR: Variables de entorno faltantes:"
     for var in "${MISSING_VARS[@]}"; do
         echo "  - $var"
     done
@@ -36,7 +36,7 @@ if [ ${#MISSING_VARS[@]} -ne 0 ]; then
     exit 1
 fi
 
-echo "✅ Todas las variables de entorno están configuradas"
+echo "Todas las variables de entorno están configuradas"
 echo ""
 
 # Crear directorios necesarios (con permisos correctos para el usuario actual)

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Script de Prueba de Envío Masivo de Emails
-Envía emails reales a direcciones temporales de Mailinator
-y mide el rendimiento del relay
+Mass Email Sending Test Script
+Sends real emails to temporary Mailinator addresses
+and measures relay performance
 """
 
 import smtplib
@@ -21,18 +21,18 @@ import string
 import requests
 import json
 
-# Agregar path al módulo
+# Add path to module
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-# Configuración
-SMTP_SERVER = "smtp.aguafria.mx"
+# Configuration
+SMTP_SERVER = "localhost"
 SMTP_PORT_SSL = 465
 SMTP_PORT_STARTTLS = 587
-USERNAME = "contpaq.nominas@aguafria.mx"
-PASSWORD = "Ksh456Ljd953e1gg5r6yyu1"  # Cambiar según tu configuración
-FROM_EMAIL = "contpaq.nominas@aguafria.mx"
+USERNAME = "your.username"
+PASSWORD = "your.password"
+FROM_EMAIL = "sender@example.com"
 
-# Colores para terminal
+# Terminal colors
 class Colors:
     GREEN = '\033[92m'
     RED = '\033[91m'
@@ -43,7 +43,7 @@ class Colors:
     RESET = '\033[0m'
     BOLD = '\033[1m'
 
-# Estadísticas globales
+# Global statistics
 stats = {
     'total': 0,
     'success': 0,
@@ -56,28 +56,28 @@ stats = {
     'start_time': None,
     'end_time': None,
     'response_times': [],
-    'verified_delivered': 0,  # Emails verificados como entregados
-    'verified_failed': 0,     # Emails que no llegaron
-    'verification_errors': 0, # Errores al verificar
+    'verified_delivered': 0,  # Verified as delivered emails
+    'verified_failed': 0,     # Emails that didn't arrive
+    'verification_errors': 0, # Errors during verification
 }
 stats_lock = threading.Lock()
 
-# Lista de emails enviados para verificación
+# List of sent emails for verification
 sent_emails = []
 sent_emails_lock = threading.Lock()
 
 
 def check_mailinator_inbox(unique_id, max_retries=3, retry_delay=2):
     """
-    Verifica si un email llegó a Mailinator
+    Check if an email arrived at Mailinator
     
     Args:
-        unique_id: ID único del inbox de Mailinator
-        max_retries: Número de reintentos
-        retry_delay: Segundos entre reintentos
+        unique_id: Unique Mailinator inbox ID
+        max_retries: Number of retries
+        retry_delay: Seconds between retries
     
     Returns:
-        dict con resultado de la verificación
+        dict with verification result
     """
     result = {
         'found': False,
@@ -85,8 +85,8 @@ def check_mailinator_inbox(unique_id, max_retries=3, retry_delay=2):
         'error': None
     }
     
-    # API pública de Mailinator
-    # Nota: Mailinator tiene una API pública simple sin autenticación
+    # Mailinator public API
+    # Note: Mailinator has a simple public API without authentication
     url = f"https://www.mailinator.com/api/webinbox?to={unique_id}&token=public"
     
     for attempt in range(max_retries):
@@ -96,13 +96,13 @@ def check_mailinator_inbox(unique_id, max_retries=3, retry_delay=2):
             if response.status_code == 200:
                 data = response.json()
                 
-                # Verificar si hay mensajes
+                # Check if there are messages
                 if 'messages' in data and len(data['messages']) > 0:
                     result['found'] = True
                     result['messages_count'] = len(data['messages'])
                     return result
                 else:
-                    # No hay mensajes aún, esperar y reintentar
+                    # No messages yet, wait and retry
                     if attempt < max_retries - 1:
                         time.sleep(retry_delay)
                     continue
@@ -113,7 +113,7 @@ def check_mailinator_inbox(unique_id, max_retries=3, retry_delay=2):
                 continue
                 
         except requests.exceptions.Timeout:
-            result['error'] = "Timeout al verificar"
+            result['error'] = "Timeout during verification"
             if attempt < max_retries - 1:
                 time.sleep(retry_delay)
             continue
@@ -128,14 +128,14 @@ def check_mailinator_inbox(unique_id, max_retries=3, retry_delay=2):
 
 def verify_deliveries(emails_to_verify, show_progress=True):
     """
-    Verifica la entrega de múltiples emails
+    Verify the delivery of multiple emails
     
     Args:
-        emails_to_verify: Lista de emails a verificar
-        show_progress: Mostrar progreso en pantalla
+        emails_to_verify: List of emails to verify
+        show_progress: Show progress on screen
     
     Returns:
-        dict con estadísticas de verificación
+        dict with verification statistics
     """
     verification_results = {
         'total': len(emails_to_verify),
@@ -146,18 +146,18 @@ def verify_deliveries(emails_to_verify, show_progress=True):
     }
     
     if show_progress:
-        print(f"\n{Colors.CYAN}Verificando entrega de emails...{Colors.RESET}")
-        print(f"Esperando unos segundos para que lleguen los emails...\n")
-        time.sleep(5)  # Dar tiempo a que lleguen los emails
+        print(f"\n{Colors.CYAN}Verifying email delivery...{Colors.RESET}")
+        print(f"Waiting a few seconds for emails to arrive...\n")
+        time.sleep(5)  # Give time for emails to arrive
     
     for i, email_info in enumerate(emails_to_verify, 1):
         unique_id = email_info['unique_id']
         
         if show_progress:
-            sys.stdout.write(f'\r{Colors.CYAN}Verificando: {i}/{verification_results["total"]} '
-                           f'| ✅ {verification_results["delivered"]} '
-                           f'❌ {verification_results["not_delivered"]} '
-                           f'⚠️  {verification_results["errors"]}{Colors.RESET}')
+            sys.stdout.write(f'\r{Colors.CYAN}Verifying: {i}/{verification_results["total"]} '
+                           f'| OK {verification_results["delivered"]} '
+                           f'FAIL {verification_results["not_delivered"]} '
+                           f'ERR {verification_results["errors"]}{Colors.RESET}')
             sys.stdout.flush()
         
         check_result = check_mailinator_inbox(unique_id)
@@ -186,25 +186,25 @@ def verify_deliveries(emails_to_verify, show_progress=True):
         
         verification_results['details'].append(detail)
         
-        # Pequeño delay para no saturar la API de Mailinator
+        # Small delay to avoid saturating Mailinator API
         time.sleep(0.5)
     
     if show_progress:
-        print()  # Nueva línea después del progreso
+        print()  # New line after progress
     
     return verification_results
 
 
 def generate_test_email(index):
     """
-    Genera un email de prueba único usando Mailinator
-    Mailinator permite ver los emails en https://www.mailinator.com/v4/public/inboxes.jsp?to=NOMBRE
+    Generate a unique test email using Mailinator
+    Mailinator allows viewing emails at https://www.mailinator.com/v4/public/inboxes.jsp?to=NAME
     """
-    # Generar ID único
+    # Generate unique ID
     unique_id = f"test{index:05d}-{int(time.time())}"
     
-    # Usar mailinator.com - cualquier email @mailinator.com es válido
-    # También soporta otros dominios como @guerrillamail.com
+    # Use mailinator.com - any email @mailinator.com is valid
+    # Also supports other domains like @guerrillamail.com
     test_email = f"{unique_id}@mailinator.com"
     
     return test_email, unique_id
@@ -212,10 +212,10 @@ def generate_test_email(index):
 
 def send_single_email(email_number, use_ssl=True, timeout=30):
     """
-    Envía un email individual
+    Send a single email
     
     Returns:
-        dict con resultado del envío
+        dict with sending result
     """
     start_time = time.time()
     to_email, unique_id = generate_test_email(email_number)
@@ -231,13 +231,13 @@ def send_single_email(email_number, use_ssl=True, timeout=30):
     }
     
     try:
-        # Crear mensaje
+        # Create message
         msg = MIMEMultipart('alternative')
         msg['From'] = FROM_EMAIL
         msg['To'] = to_email
-        msg['Subject'] = f"Test #{email_number:05d} - Prueba de Carga SMTP Relay"
+        msg['Subject'] = f"Test #{email_number:05d} - SMTP Relay Load Test"
         
-        # Cuerpo HTML
+        # HTML body
         html_body = f"""
         <!DOCTYPE html>
         <html>
@@ -252,59 +252,59 @@ def send_single_email(email_number, use_ssl=True, timeout=30):
         </head>
         <body>
             <div class="header">
-                <h1>✅ Email de Prueba Recibido</h1>
+                <h1>Test Email Received</h1>
             </div>
             <div class="content">
-                <h2>Información del Email</h2>
+                <h2>Email Information</h2>
                 <div class="info">
-                    <p><strong>Número de Email:</strong> #{email_number:05d}</p>
-                    <p><strong>ID Único:</strong> {unique_id}</p>
-                    <p><strong>Timestamp Envío:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-                    <p><strong>Destinatario:</strong> {to_email}</p>
-                    <p><strong>Remitente:</strong> {FROM_EMAIL}</p>
+                    <p><strong>Email Number:</strong> #{email_number:05d}</p>
+                    <p><strong>Unique ID:</strong> {unique_id}</p>
+                    <p><strong>Send Timestamp:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+                    <p><strong>Recipient:</strong> {to_email}</p>
+                    <p><strong>Sender:</strong> {FROM_EMAIL}</p>
                 </div>
                 
-                <h2>Estado del Envío</h2>
-                <p class="success">✅ Si estás leyendo esto, el email llegó correctamente</p>
+                <h2>Delivery Status</h2>
+                <p class="success">If you are reading this, the email arrived successfully</p>
                 
-                <h2>Verificación</h2>
-                <p>Puedes verificar este email en:</p>
+                <h2>Verification</h2>
+                <p>You can verify this email at:</p>
                 <p><a href="https://www.mailinator.com/v4/public/inboxes.jsp?to={unique_id}">
                    https://www.mailinator.com/v4/public/inboxes.jsp?to={unique_id}
                 </a></p>
                 
                 <hr>
                 <p style="color: #666; font-size: 12px;">
-                    Este es un email de prueba generado automáticamente por el sistema de pruebas
-                    de carga del SMTP Relay. Este mensaje se autodestruirá en unas horas.
+                    This is a test email automatically generated by the SMTP Relay load testing system.
+                    This message will self-destruct in a few hours.
                 </p>
             </div>
         </body>
         </html>
         """
         
-        # Cuerpo texto plano (fallback)
+        # Plain text body (fallback)
         text_body = f"""
-        EMAIL DE PRUEBA #{email_number:05d}
+        TEST EMAIL #{email_number:05d}
         =====================================
         
-        ID Único: {unique_id}
+        Unique ID: {unique_id}
         Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-        Destinatario: {to_email}
-        Remitente: {FROM_EMAIL}
+        Recipient: {to_email}
+        Sender: {FROM_EMAIL}
         
-        ✅ Si estás leyendo esto, el email llegó correctamente
+        If you are reading this, the email arrived successfully
         
-        Verificar en: https://www.mailinator.com/v4/public/inboxes.jsp?to={unique_id}
+        Verify at: https://www.mailinator.com/v4/public/inboxes.jsp?to={unique_id}
         
         ---
-        Este es un email de prueba del sistema SMTP Relay
+        This is a test email from the SMTP Relay system
         """
         
         msg.attach(MIMEText(text_body, 'plain'))
         msg.attach(MIMEText(html_body, 'html'))
         
-        # Conectar y enviar
+        # Connect and send
         port = SMTP_PORT_SSL if use_ssl else SMTP_PORT_STARTTLS
         
         if use_ssl:
@@ -317,7 +317,7 @@ def send_single_email(email_number, use_ssl=True, timeout=30):
         smtp.send_message(msg)
         smtp.quit()
         
-        # Éxito
+        # Success
         result['success'] = True
         result['response_time'] = time.time() - start_time
         
@@ -336,14 +336,14 @@ def send_single_email(email_number, use_ssl=True, timeout=30):
         return result
         
     except smtplib.SMTPAuthenticationError as e:
-        result['error'] = f"Error de autenticación: {str(e)}"
+        result['error'] = f"Authentication error: {str(e)}"
         with stats_lock:
             stats['auth_errors'] += 1
             stats['failed'] += 1
             stats['smtp_errors']['auth'] += 1
     
     except smtplib.SMTPServerDisconnected as e:
-        result['error'] = f"Servidor desconectado: {str(e)}"
+        result['error'] = f"Server disconnected: {str(e)}"
         with stats_lock:
             stats['connection_errors'] += 1
             stats['failed'] += 1
@@ -359,19 +359,19 @@ def send_single_email(email_number, use_ssl=True, timeout=30):
     except smtplib.SMTPException as e:
         error_msg = str(e).lower()
         if any(word in error_msg for word in ['rate', 'limit', 'too many', 'throttl']):
-            result['error'] = f"Rate limit alcanzado: {str(e)}"
+            result['error'] = f"Rate limit reached: {str(e)}"
             with stats_lock:
                 stats['rate_limited'] += 1
                 stats['failed'] += 1
                 stats['smtp_errors']['rate_limit'] += 1
         else:
-            result['error'] = f"Error SMTP: {str(e)}"
+            result['error'] = f"SMTP error: {str(e)}"
             with stats_lock:
                 stats['failed'] += 1
                 stats['smtp_errors']['smtp_general'] += 1
     
     except Exception as e:
-        result['error'] = f"Error desconocido: {type(e).__name__}: {str(e)}"
+        result['error'] = f"Unknown error: {type(e).__name__}: {str(e)}"
         with stats_lock:
             stats['failed'] += 1
             stats['smtp_errors']['unknown'] += 1
@@ -381,7 +381,7 @@ def send_single_email(email_number, use_ssl=True, timeout=30):
 
 
 def print_progress_bar(current, total, start_time, bar_length=50):
-    """Imprime barra de progreso"""
+    """Print progress bar"""
     percent = (current / total) * 100
     elapsed = time.time() - start_time
     rate = current / elapsed if elapsed > 0 else 0
@@ -392,71 +392,71 @@ def print_progress_bar(current, total, start_time, bar_length=50):
     
     sys.stdout.write(f'\r{Colors.CYAN}[{bar}] {percent:5.1f}% '
                      f'({current}/{total}) | '
-                     f'✅ {stats["success"]} ❌ {stats["failed"]} | '
-                     f'⚡ {rate:.1f}/s | '
+                     f'OK {stats["success"]} FAIL {stats["failed"]} | '
+                     f'{rate:.1f}/s | '
                      f'ETA: {eta:.0f}s{Colors.RESET}')
     sys.stdout.flush()
 
 
 def print_summary():
-    """Imprime resumen de resultados"""
+    """Print results summary"""
     total_time = stats['end_time'] - stats['start_time']
     
     print("\n\n" + "=" * 80)
-    print(f"{Colors.BOLD}{Colors.CYAN}📊 RESUMEN DE PRUEBA DE CARGA{Colors.RESET}")
+    print(f"{Colors.BOLD}{Colors.CYAN}LOAD TEST SUMMARY{Colors.RESET}")
     print("=" * 80)
     
-    # Resultados generales
+    # General results
     print(f"\n{Colors.BOLD}Emails:{Colors.RESET}")
-    print(f"  Total enviados: {stats['total']}")
-    print(f"  {Colors.GREEN}✅ Exitosos: {stats['success']} ({stats['success']/stats['total']*100:.1f}%){Colors.RESET}")
-    print(f"  {Colors.RED}❌ Fallidos: {stats['failed']} ({stats['failed']/stats['total']*100:.1f}%){Colors.RESET}")
+    print(f"  Total sent: {stats['total']}")
+    print(f"  {Colors.GREEN}Successful: {stats['success']} ({stats['success']/stats['total']*100:.1f}%){Colors.RESET}")
+    print(f"  {Colors.RED}Failed: {stats['failed']} ({stats['failed']/stats['total']*100:.1f}%){Colors.RESET}")
     
-    # Desglose de errores
+    # Error breakdown
     if stats['failed'] > 0:
-        print(f"\n{Colors.BOLD}Errores:{Colors.RESET}")
+        print(f"\n{Colors.BOLD}Errors:{Colors.RESET}")
         if stats['auth_errors'] > 0:
-            print(f"  🔐 Autenticación: {stats['auth_errors']}")
+            print(f"  Authentication: {stats['auth_errors']}")
         if stats['connection_errors'] > 0:
-            print(f"  🔌 Conexión: {stats['connection_errors']}")
+            print(f"  Connection: {stats['connection_errors']}")
         if stats['timeout_errors'] > 0:
-            print(f"  ⏱️  Timeout: {stats['timeout_errors']}")
+            print(f"  Timeout: {stats['timeout_errors']}")
         if stats['rate_limited'] > 0:
-            print(f"  {Colors.RED}🚦 Rate Limit: {stats['rate_limited']}{Colors.RESET}")
+            print(f"  {Colors.RED}Rate Limit: {stats['rate_limited']}{Colors.RESET}")
         
         if stats['smtp_errors']:
-            print(f"\n{Colors.BOLD}  Desglose detallado:{Colors.RESET}")
+            print(f"\n{Colors.BOLD}  Detailed breakdown:{Colors.RESET}")
             for error_type, count in sorted(stats['smtp_errors'].items(), key=lambda x: x[1], reverse=True):
-                print(f"    • {error_type}: {count}")
+                print(f"    - {error_type}: {count}")
     
-    # Rendimiento
-    print(f"\n{Colors.BOLD}Rendimiento:{Colors.RESET}")
-    print(f"  ⏱️  Tiempo total: {total_time:.2f} segundos")
-    print(f"  ⚡ Tasa promedio: {stats['total']/total_time:.2f} emails/seg")
+    # Performance
+    print(f"\n{Colors.BOLD}Performance:{Colors.RESET}")
+    print(f"  Total time: {total_time:.2f} seconds")
+    print(f"  Average rate: {stats['total']/total_time:.2f} emails/sec")
     
     if stats['response_times']:
         avg_time = sum(stats['response_times']) / len(stats['response_times'])
         min_time = min(stats['response_times'])
         max_time = max(stats['response_times'])
-        print(f"  📊 Tiempo de respuesta:")
-        print(f"     - Promedio: {avg_time:.3f}s")
-        print(f"     - Mínimo: {min_time:.3f}s")
-        print(f"     - Máximo: {max_time:.3f}s")
+        print(f"  Response time:")
+        print(f"     - Average: {avg_time:.3f}s")
+        print(f"     - Minimum: {min_time:.3f}s")
+        print(f"     - Maximum: {max_time:.3f}s")
     
-    # Proyecciones
+    # Projections
     if stats['success'] > 0:
         rate_per_minute = (stats['success'] / total_time) * 60
-        print(f"\n{Colors.BOLD}Proyecciones:{Colors.RESET}")
-        print(f"  📧 Capacidad real: ~{rate_per_minute:.0f} emails/minuto")
-        print(f"  📊 Para 100 emails: ~{100/rate_per_minute:.1f} minutos")
-        print(f"  📊 Para 500 emails: ~{500/rate_per_minute:.1f} minutos")
-        print(f"  📊 Para 1000 emails: ~{1000/rate_per_minute:.1f} minutos")
+        print(f"\n{Colors.BOLD}Projections:{Colors.RESET}")
+        print(f"  Real capacity: ~{rate_per_minute:.0f} emails/minute")
+        print(f"  For 100 emails: ~{100/rate_per_minute:.1f} minutes")
+        print(f"  For 500 emails: ~{500/rate_per_minute:.1f} minutes")
+        print(f"  For 1000 emails: ~{1000/rate_per_minute:.1f} minutes")
     
-    # Verificación de emails
+    # Email verification
     if sent_emails:
-        print(f"\n{Colors.BOLD}📬 Verificación Automática de Entregas:{Colors.RESET}")
+        print(f"\n{Colors.BOLD}Automatic Delivery Verification:{Colors.RESET}")
         
-        # Realizar verificación automática
+        # Perform automatic verification
         verification_results = verify_deliveries(sent_emails, show_progress=True)
         
         delivered = verification_results['delivered']
@@ -464,111 +464,111 @@ def print_summary():
         errors = verification_results['errors']
         total_verified = verification_results['total']
         
-        print(f"  Total verificados: {total_verified}")
-        print(f"  {Colors.GREEN}✅ Entregados: {delivered} ({delivered/total_verified*100:.1f}%){Colors.RESET}")
-        print(f"  {Colors.RED}❌ No entregados: {not_delivered} ({not_delivered/total_verified*100:.1f}%){Colors.RESET}")
-        print(f"  {Colors.YELLOW}⚠️  Errores de verificación: {errors} ({errors/total_verified*100:.1f}%){Colors.RESET}")
+        print(f"  Total verified: {total_verified}")
+        print(f"  {Colors.GREEN}Delivered: {delivered} ({delivered/total_verified*100:.1f}%){Colors.RESET}")
+        print(f"  {Colors.RED}Not delivered: {not_delivered} ({not_delivered/total_verified*100:.1f}%){Colors.RESET}")
+        print(f"  {Colors.YELLOW}Verification errors: {errors} ({errors/total_verified*100:.1f}%){Colors.RESET}")
         
-        # Tasa de entrega real vs aceptación SMTP
+        # Real delivery rate vs SMTP acceptance
         if stats['success'] > 0:
             delivery_rate = delivered / stats['success'] * 100
-            print(f"\n  {Colors.CYAN}📊 Tasa de entrega real: {delivery_rate:.1f}% (de emails aceptados por SMTP){Colors.RESET}")
+            print(f"\n  {Colors.CYAN}Real delivery rate: {delivery_rate:.1f}% (of emails accepted by SMTP){Colors.RESET}")
         
-        # Mostrar algunos ejemplos de verificación manual
-        print(f"\n  {Colors.YELLOW}Verificación manual (primeros 3):{Colors.RESET}")
+        # Show some manual verification examples
+        print(f"\n  {Colors.YELLOW}Manual verification (first 3):{Colors.RESET}")
         for i, email in enumerate(sent_emails[:3], 1):
             url = f"https://www.mailinator.com/v4/public/inboxes.jsp?to={email['unique_id']}"
             print(f"    {i}. {email['to']}")
             print(f"       {Colors.CYAN}{url}{Colors.RESET}")
 
     
-    # Recomendaciones
-    print(f"\n{Colors.BOLD}{Colors.YELLOW}💡 RECOMENDACIONES:{Colors.RESET}")
+    # Recommendations
+    print(f"\n{Colors.BOLD}{Colors.YELLOW}RECOMMENDATIONS:{Colors.RESET}")
     
     success_rate = (stats['success'] / stats['total']) * 100
     
-    # Verificar tasa de entrega real si hay datos
+    # Check real delivery rate if data available
     if stats['verified_delivered'] > 0 and stats['success'] > 0:
         actual_delivery_rate = (stats['verified_delivered'] / stats['success']) * 100
         
         if actual_delivery_rate < 90:
-            print(f"  {Colors.RED}⚠️  BAJA TASA DE ENTREGA REAL ({actual_delivery_rate:.1f}%){Colors.RESET}")
-            print(f"     • Los emails se aceptan por SMTP pero no llegan al destino")
-            print(f"     • Verifica configuración de Microsoft Graph API")
-            print(f"     • Revisa logs del servidor para errores de relay")
+            print(f"  {Colors.RED}LOW REAL DELIVERY RATE ({actual_delivery_rate:.1f}%){Colors.RESET}")
+            print(f"     - Emails are accepted by SMTP but don't reach destination")
+            print(f"     - Check Microsoft Graph API configuration")
+            print(f"     - Review server logs for relay errors")
     
     if stats['rate_limited'] > 0:
-        print(f"  {Colors.RED}⚠️  RATE LIMITING DETECTADO{Colors.RESET}")
-        print(f"     • Aumenta RATE_LIMIT_PER_MINUTE en .env")
-        print(f"     • Considera implementar sistema de colas")
-        print(f"     • Reduce concurrencia o agrega delays")
+        print(f"  {Colors.RED}RATE LIMITING DETECTED{Colors.RESET}")
+        print(f"     - Increase RATE_LIMIT_PER_MINUTE in .env")
+        print(f"     - Consider implementing queue system")
+        print(f"     - Reduce concurrency or add delays")
     
     if stats['timeout_errors'] > total_time * 0.1:
-        print(f"  ⚠️  Muchos timeouts detectados")
-        print(f"     • Reduce el número de conexiones concurrentes")
-        print(f"     • Verifica recursos del servidor")
+        print(f"  Many timeouts detected")
+        print(f"     - Reduce number of concurrent connections")
+        print(f"     - Check server resources")
     
     if success_rate < 95:
-        print(f"  {Colors.RED}⚠️  Tasa de éxito baja ({success_rate:.1f}%){Colors.RESET}")
-        print(f"     • Revisa logs del servidor: docker-compose logs")
-        print(f"     • Verifica configuración de Microsoft Graph API")
+        print(f"  {Colors.RED}Low success rate ({success_rate:.1f}%){Colors.RESET}")
+        print(f"     - Review server logs: docker-compose logs")
+        print(f"     - Check Microsoft Graph API configuration")
     elif success_rate >= 99:
-        print(f"  {Colors.GREEN}✅ Excelente tasa de éxito ({success_rate:.1f}%){Colors.RESET}")
+        print(f"  {Colors.GREEN}Excellent success rate ({success_rate:.1f}%){Colors.RESET}")
 
     
     print("\n" + "=" * 80 + "\n")
 
 
 def main():
-    """Función principal"""
+    """Main function"""
     parser = argparse.ArgumentParser(
-        description='Prueba de carga para SMTP Relay con emails reales',
+        description='Load test for SMTP Relay with real emails',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Ejemplos de uso:
-  %(prog)s --emails 100 --threads 5          # 100 emails, 5 concurrentes
-  %(prog)s --emails 1000 --threads 10        # 1000 emails, 10 concurrentes
-  %(prog)s --emails 50 --mode starttls       # Usar STARTTLS en vez de SSL
+Usage examples:
+  %(prog)s --emails 100 --threads 5          # 100 emails, 5 concurrent
+  %(prog)s --emails 1000 --threads 10        # 1000 emails, 10 concurrent
+  %(prog)s --emails 50 --mode starttls       # Use STARTTLS instead of SSL
         """
     )
     
     parser.add_argument('--emails', type=int, default=100,
-                        help='Número de emails a enviar (default: 100)')
+                        help='Number of emails to send (default: 100)')
     parser.add_argument('--threads', type=int, default=5,
-                        help='Conexiones concurrentes (default: 5)')
+                        help='Concurrent connections (default: 5)')
     parser.add_argument('--mode', choices=['ssl', 'starttls'], default='ssl',
-                        help='Modo de conexión (default: ssl)')
+                        help='Connection mode (default: ssl)')
     parser.add_argument('--timeout', type=int, default=30,
-                        help='Timeout de conexión en segundos (default: 30)')
+                        help='Connection timeout in seconds (default: 30)')
     
     args = parser.parse_args()
     
-    # Configurar estadísticas
+    # Configure statistics
     stats['total'] = args.emails
     use_ssl = (args.mode == 'ssl')
     port = SMTP_PORT_SSL if use_ssl else SMTP_PORT_STARTTLS
     
-    # Imprimir encabezado
+    # Print header
     print("\n" + "=" * 80)
-    print(f"{Colors.BOLD}{Colors.CYAN}📧 PRUEBA DE CARGA SMTP RELAY{Colors.RESET}")
+    print(f"{Colors.BOLD}{Colors.CYAN}SMTP RELAY LOAD TEST{Colors.RESET}")
     print("=" * 80)
-    print(f"\n{Colors.BOLD}Configuración:{Colors.RESET}")
-    print(f"  Servidor: {SMTP_SERVER}:{port}")
-    print(f"  Modo: {args.mode.upper()}")
-    print(f"  Emails a enviar: {args.emails}")
-    print(f"  Conexiones concurrentes: {args.threads}")
-    print(f"  Usuario: {USERNAME}")
-    print(f"  Remitente: {FROM_EMAIL}")
-    print(f"\n{Colors.YELLOW}Los emails se enviarán a direcciones @mailinator.com")
-    print(f"Puedes verificar su recepción en https://www.mailinator.com{Colors.RESET}\n")
+    print(f"\n{Colors.BOLD}Configuration:{Colors.RESET}")
+    print(f"  Server: {SMTP_SERVER}:{port}")
+    print(f"  Mode: {args.mode.upper()}")
+    print(f"  Emails to send: {args.emails}")
+    print(f"  Concurrent connections: {args.threads}")
+    print(f"  User: {USERNAME}")
+    print(f"  Sender: {FROM_EMAIL}")
+    print(f"\n{Colors.YELLOW}Emails will be sent to @mailinator.com addresses")
+    print(f"You can verify receipt at https://www.mailinator.com{Colors.RESET}\n")
     
-    input(f"{Colors.BOLD}Presiona ENTER para comenzar...{Colors.RESET} ")
+    input(f"{Colors.BOLD}Press ENTER to start...{Colors.RESET} ")
     
-    # Iniciar prueba
-    print(f"\n{Colors.CYAN}Iniciando envío de emails...{Colors.RESET}\n")
+    # Start test
+    print(f"\n{Colors.CYAN}Starting email sending...{Colors.RESET}\n")
     stats['start_time'] = time.time()
     
-    # Enviar emails con ThreadPoolExecutor
+    # Send emails with ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=args.threads) as executor:
         futures = {
             executor.submit(send_single_email, i, use_ssl, args.timeout): i 
@@ -581,16 +581,16 @@ Ejemplos de uso:
             try:
                 result = future.result()
                 if not result['success'] and result['error']:
-                    # Log errores en tiempo real (opcional)
+                    # Log errors in real time (optional)
                     pass
             except Exception as e:
-                print(f"\n{Colors.RED}Error procesando email: {e}{Colors.RESET}")
+                print(f"\n{Colors.RED}Error processing email: {e}{Colors.RESET}")
             
             print_progress_bar(completed, args.emails, stats['start_time'])
     
     stats['end_time'] = time.time()
     
-    # Imprimir resumen
+    # Print summary
     print_summary()
 
 
@@ -598,10 +598,10 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print(f"\n\n{Colors.YELLOW}Prueba interrumpida por el usuario{Colors.RESET}\n")
+        print(f"\n\n{Colors.YELLOW}Test interrupted by user{Colors.RESET}\n")
         sys.exit(1)
     except Exception as e:
-        print(f"\n\n{Colors.RED}Error fatal: {e}{Colors.RESET}\n")
+        print(f"\n\n{Colors.RED}Fatal error: {e}{Colors.RESET}\n")
         import traceback
         traceback.print_exc()
         sys.exit(1)
