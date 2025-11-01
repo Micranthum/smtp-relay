@@ -403,12 +403,17 @@ class SSLSMTPController(Controller):
         self.loop = loop
         
         try:
+            # Create and start the server
             self.server = loop.run_until_complete(self._create_server(loop))
+            
+            # Verify server is actually listening
+            loop.run_until_complete(asyncio.sleep(0.1))
+            
+            # Signal that we're ready
+            ready_event.set()
         except Exception as error:
             ready_event.set()
             raise error
-        
-        ready_event.set()
         
         try:
             loop.run_forever()

@@ -65,6 +65,7 @@ class SMTPRelayServer:
                 hostname=Config.SMTP_RELAY_HOST,
                 port=Config.SMTP_SSL_PORT,
                 tls_context=tls_context,
+                ready_timeout=30,  # Increased timeout for SSL setup
             )
             
             # Start servers
