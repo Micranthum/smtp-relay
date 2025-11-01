@@ -26,24 +26,51 @@ class SMTPRelayServer:
             
             # Log environment info
             logger.info(f"Environment: {Config.ENVIRONMENT}")
+            logger.info(f"Encryption Mode: {Config.SMTP_ENCRYPTION_MODE}")
             logger.info(f"TLS Enabled: {Config.SMTP_RELAY_USE_TLS}")
             logger.info(f"IP Whitelist: {Config.ALLOWED_IPS}")
             logger.info(f"Sender Whitelist: {Config.ALLOWED_SENDERS}")
             logger.info(f"Rate Limit: {Config.RATE_LIMIT_PER_MINUTE} emails/minute")
             
-            # Create TLS context if enabled
+            # Create TLS context based on encryption mode
             tls_context = None
-            if Config.SMTP_RELAY_USE_TLS:
+            require_starttls = False
+            
+            if Config.SMTP_ENCRYPTION_MODE == 'SSL':
+                # SSL mode: implicit TLS from connection start (like port 465)
                 try:
                     tls_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
                     tls_context.load_cert_chain(
                         certfile=Config.TLS_CERT_FILE,
                         keyfile=Config.TLS_KEY_FILE
                     )
-                    logger.info("✅ TLS context created successfully")
+                    require_starttls = False  # No STARTTLS command, TLS is implicit
+                    logger.info("✅ SSL mode: TLS context created (implicit TLS)")
                 except Exception as e:
-                    logger.error(f"❌ Failed to create TLS context: {e}")
+                    logger.error(f"❌ Failed to create TLS context for SSL mode: {e}")
                     raise
+                    
+            elif Config.SMTP_ENCRYPTION_MODE == 'STARTTLS':
+                # STARTTLS mode: optional upgrade to TLS after connection
+                if Config.SMTP_RELAY_USE_TLS:
+                    try:
+                        tls_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                        tls_context.load_cert_chain(
+                            certfile=Config.TLS_CERT_FILE,
+                            keyfile=Config.TLS_KEY_FILE
+                        )
+                        require_starttls = False  # Don't require, but offer STARTTLS
+                        logger.info("✅ STARTTLS mode: TLS context created (optional upgrade)")
+                    except Exception as e:
+                        logger.error(f"❌ Failed to create TLS context for STARTTLS mode: {e}")
+                        raise
+                else:
+                    logger.info("⚠️  STARTTLS mode: TLS disabled (plain text connections)")
+                    
+            elif Config.SMTP_ENCRYPTION_MODE == 'NONE':
+                # No encryption
+                logger.warning("⚠️  WARNING: No encryption enabled - connections will be in plain text!")
+                logger.warning("⚠️  This is NOT recommended for production use!")
             
             # Create handler
             handler = SMTPRelayHandler()
@@ -54,6 +81,7 @@ class SMTPRelayServer:
                 hostname=Config.SMTP_RELAY_HOST,
                 port=Config.SMTP_RELAY_PORT,
                 tls_context=tls_context,
+                require_starttls=require_starttls,
             )
             
             # Start server

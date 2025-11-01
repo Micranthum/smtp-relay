@@ -245,16 +245,17 @@ class SMTPRelayHandler:
 class AuthenticatedSMTPController(Controller):
     """SMTP Controller with authentication support"""
     
-    def __init__(self, handler, tls_context=None, **kwargs):
+    def __init__(self, handler, tls_context=None, require_starttls=False, **kwargs):
         self.handler_instance = handler
         self.tls_context = tls_context
+        self.require_starttls = require_starttls
         super().__init__(handler, **kwargs)
     
     def factory(self):
         """Create SMTP server instance with authentication"""
         return AuthenticatedSMTP(
             self.handler_instance,
-            require_starttls=self.tls_context is not None,
+            require_starttls=self.require_starttls,
             tls_context=self.tls_context,
             authenticator=self._authenticate,
             auth_require_tls=False,
