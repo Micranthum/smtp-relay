@@ -8,7 +8,7 @@ import sys
 import ssl
 from .config import Config
 from .logger import logger
-from .relay import SMTPRelayHandler, AuthenticatedSMTPController
+from .relay import SMTPRelayHandler, AuthenticatedSMTPController, SSLSMTPController
 
 class SMTPRelayServer:
     """Main SMTP Relay Server"""
@@ -56,18 +56,15 @@ class SMTPRelayServer:
                 port=Config.SMTP_STARTTLS_PORT,
                 tls_context=tls_context,
                 require_starttls=False,  # Optional STARTTLS
-                ssl_mode=False,
             )
             
             # Create SSL/TLS controller (port 465) with implicit TLS
             logger.info(f"Setting up SSL server on port {Config.SMTP_SSL_PORT} (implicit TLS)...")
-            self.controller_ssl = AuthenticatedSMTPController(
+            self.controller_ssl = SSLSMTPController(
                 handler_ssl,
                 hostname=Config.SMTP_RELAY_HOST,
                 port=Config.SMTP_SSL_PORT,
                 tls_context=tls_context,
-                require_starttls=False,
-                ssl_mode=True,  # Implicit SSL from connection start
             )
             
             # Start servers
