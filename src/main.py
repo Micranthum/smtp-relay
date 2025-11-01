@@ -56,6 +56,7 @@ class SMTPRelayServer:
                 port=Config.SMTP_STARTTLS_PORT,
                 tls_context=tls_context,
                 require_starttls=False,  # Optional STARTTLS
+                ready_timeout=30,
             )
             
             # Create SSL/TLS controller (port 465) with implicit TLS

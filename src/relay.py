@@ -387,12 +387,15 @@ class SSLSMTPController(Controller):
     
     async def _create_server(self, loop):
         """Create the server with SSL wrapping"""
-        return await loop.create_server(
+        server = await loop.create_server(
             self.factory,
             host=self.hostname,
             port=self.port,
             ssl=self.tls_context,
         )
+        # Start serving immediately
+        await server.start_serving()
+        return server
     
     def _run(self, ready_event):
         """Override to support SSL mode"""
@@ -406,8 +409,8 @@ class SSLSMTPController(Controller):
             # Create and start the server
             self.server = loop.run_until_complete(self._create_server(loop))
             
-            # Verify server is actually listening
-            loop.run_until_complete(asyncio.sleep(0.1))
+            # Give it a moment to start listening
+            loop.run_until_complete(asyncio.sleep(0.5))
             
             # Signal that we're ready
             ready_event.set()
