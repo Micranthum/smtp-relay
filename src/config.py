@@ -30,9 +30,9 @@ class Config:
     SMTP_RELAY_PASSWORD = os.getenv('SMTP_RELAY_PASSWORD', '')
     
     # Microsoft Graph API OAuth2 Configuration
-    MS365_TENANT_ID = os.getenv('TENANT_ID', '')
-    MS365_CLIENT_ID = os.getenv('CLIENT_ID', '')
-    MS365_CLIENT_SECRET = os.getenv('CLIENT_SECRET', '')
+    GRAPH_API_TENANT_ID = os.getenv('GRAPH_API_TENANT_ID', '')
+    GRAPH_API_CLIENT_ID = os.getenv('GRAPH_API_CLIENT_ID', '')
+    GRAPH_API_CLIENT_SECRET = os.getenv('GRAPH_API_CLIENT_SECRET', '')
     MS365_EMAIL_ADDRESS = os.getenv('MS365_EMAIL_ADDRESS', '')
     
     # Security - IP Whitelist
@@ -63,12 +63,12 @@ class Config:
             errors.append("SMTP_RELAY_USERNAME is required")
         if not cls.SMTP_RELAY_PASSWORD:
             errors.append("SMTP_RELAY_PASSWORD is required")
-        if not cls.MS365_TENANT_ID:
-            errors.append("MS365_TENANT_ID is required")
-        if not cls.MS365_CLIENT_ID:
-            errors.append("MS365_CLIENT_ID is required")
-        if not cls.MS365_CLIENT_SECRET:
-            errors.append("MS365_CLIENT_SECRET is required")
+        if not cls.GRAPH_API_TENANT_ID:
+            errors.append("GRAPH_API_TENANT_ID is required")
+        if not cls.GRAPH_API_CLIENT_ID:
+            errors.append("GRAPH_API_CLIENT_ID is required")
+        if not cls.GRAPH_API_CLIENT_SECRET:
+            errors.append("GRAPH_API_CLIENT_SECRET is required")
         if not cls.MS365_EMAIL_ADDRESS:
             errors.append("MS365_EMAIL_ADDRESS is required")
         

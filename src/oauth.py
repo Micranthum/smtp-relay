@@ -12,9 +12,9 @@ class MS365OAuth:
     """Handle OAuth2 authentication with Microsoft 365"""
     
     def __init__(self):
-        self.tenant_id = Config.MS365_TENANT_ID
-        self.client_id = Config.MS365_CLIENT_ID
-        self.client_secret = Config.MS365_CLIENT_SECRET
+        self.tenant_id = Config.GRAPH_API_TENANT_ID
+        self.client_id = Config.GRAPH_API_CLIENT_ID
+        self.client_secret = Config.GRAPH_API_CLIENT_SECRET
         self.email_address = Config.MS365_EMAIL_ADDRESS
         
         # OAuth2 scopes for Microsoft Graph API (using Mail.Send application permission)
