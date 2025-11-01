@@ -5,6 +5,8 @@ Accepts connections from Contpaq with basic auth and relays to Microsoft 365 via
 import base64
 import requests
 import json
+import ssl
+import asyncio
 from email.parser import BytesParser
 from email.policy import default
 from email.utils import parseaddr
@@ -245,18 +247,55 @@ class SMTPRelayHandler:
 class AuthenticatedSMTPController(Controller):
     """SMTP Controller with authentication support"""
     
-    def __init__(self, handler, tls_context=None, require_starttls=False, **kwargs):
+    def __init__(self, handler, tls_context=None, require_starttls=False, ssl_mode=False, **kwargs):
         self.handler_instance = handler
         self.tls_context = tls_context
         self.require_starttls = require_starttls
+        self.ssl_mode = ssl_mode  # True for implicit SSL on port 465
         super().__init__(handler, **kwargs)
+    
+    async def _create_ssl_server(self, loop):
+        """Create an SSL-wrapped server for implicit TLS (port 465)"""
+        import asyncio
+        
+        server = await loop.create_server(
+            lambda: self.factory(),
+            host=self.hostname,
+            port=self.port,
+            ssl=self.tls_context if self.ssl_mode else None,
+        )
+        return server
+    
+    def _run(self, ready_event):
+        """Override to support SSL mode"""
+        if self.ssl_mode:
+            # For SSL mode, we need custom server creation
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            self.server = loop.run_until_complete(self._create_ssl_server(loop))
+            self.loop = loop
+            ready_event.set()
+            
+            try:
+                loop.run_forever()
+            finally:
+                self.server.close()
+                loop.run_until_complete(self.server.wait_closed())
+                loop.close()
+        else:
+            # Use parent's implementation for STARTTLS mode
+            super()._run(ready_event)
     
     def factory(self):
         """Create SMTP server instance with authentication"""
+        # For both modes, create the SMTP server
+        # SSL mode will be handled by the server wrapper
         return AuthenticatedSMTP(
             self.handler_instance,
-            require_starttls=self.require_starttls,
-            tls_context=self.tls_context,
+            require_starttls=False if self.ssl_mode else self.require_starttls,
+            tls_context=None if self.ssl_mode else self.tls_context,
             authenticator=self._authenticate,
             auth_require_tls=False,
             enable_SMTPUTF8=True,

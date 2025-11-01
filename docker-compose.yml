@@ -5,6 +5,7 @@ services:
     restart: unless-stopped
     ports:
       - "587:587"
+      - "465:465"
     env_file:
       - .env
     volumes:
