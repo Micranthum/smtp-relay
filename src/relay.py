@@ -251,6 +251,7 @@ class AuthenticatedSMTPController(Controller):
         self.handler_instance = handler
         self.tls_context = tls_context
         self.require_starttls = require_starttls
+        self.auth_require_tls = require_starttls  # If STARTTLS is required, auth also requires TLS
         super().__init__(handler, **kwargs)
     
     def factory(self):
@@ -260,7 +261,7 @@ class AuthenticatedSMTPController(Controller):
             require_starttls=self.require_starttls,
             tls_context=self.tls_context,
             authenticator=self._authenticate,
-            auth_require_tls=False,
+            auth_require_tls=self.auth_require_tls,
             enable_SMTPUTF8=True,
         )
     

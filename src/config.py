@@ -19,9 +19,16 @@ class Config:
     
     # Dual server setup
     SMTP_STARTTLS_PORT = os.getenv('SMTP_STARTTLS_PORT', 587)
-    SMTP_SSL_PORT = os.getenv('SMTP_SSL_PORT', 465) 
+    SMTP_SSL_PORT = os.getenv('SMTP_SSL_PORT', 465)
+    
+    # TLS/SSL - FORCED in production, optional in development
+    # Production ALWAYS requires TLS for security, cannot be disabled
+    if ENVIRONMENT == 'production':
+        SMTP_RELAY_USE_TLS = True  # FORCED - cannot be disabled in production
+    else:
+        SMTP_RELAY_USE_TLS = os.getenv('SMTP_RELAY_USE_TLS', 'false').lower() == 'true'
 
-    # TLS/SSL Certificate Configuration (optional, for production)
+    # TLS/SSL Certificate Configuration (required when TLS is enabled)
     TLS_CERT_FILE = os.getenv('TLS_CERT_FILE', '')  # Path to certificate file
     TLS_KEY_FILE = os.getenv('TLS_KEY_FILE', '')    # Path to private key file
     
@@ -58,6 +65,16 @@ class Config:
         """Validate required configuration"""
         errors = []
         
+        # Security warning if someone tries to disable TLS in production
+        if cls.ENVIRONMENT == 'production':
+            env_tls = os.getenv('SMTP_RELAY_USE_TLS', '').lower()
+            if env_tls == 'false':
+                print("=" * 70)
+                print("SECURITY WARNING: Attempted to disable TLS in production!")
+                print("TLS is MANDATORY in production and has been force-enabled.")
+                print("Remove SMTP_RELAY_USE_TLS=false from your .env file.")
+                print("=" * 70)
+        
         # Required fields
         if not cls.SMTP_RELAY_USERNAME:
             errors.append("SMTP_RELAY_USERNAME is required")
@@ -72,22 +89,30 @@ class Config:
         if not cls.MS365_EMAIL_ADDRESS:
             errors.append("MS365_EMAIL_ADDRESS is required")
         
-        # TLS Certificate validation (required for both servers)
-        if not cls.TLS_CERT_FILE or not cls.TLS_KEY_FILE:
-            errors.append("TLS_CERT_FILE and TLS_KEY_FILE are required")
-        elif cls.TLS_CERT_FILE and cls.TLS_KEY_FILE:
-            cert_path = Path(cls.TLS_CERT_FILE)
-            key_path = Path(cls.TLS_KEY_FILE)
-            if not cert_path.exists():
-                errors.append(f"TLS certificate file not found: {cls.TLS_CERT_FILE}")
-            if not key_path.exists():
-                errors.append(f"TLS key file not found: {cls.TLS_KEY_FILE}")
+        # TLS Certificate validation (only required when TLS is enabled)
+        if cls.SMTP_RELAY_USE_TLS:
+            if not cls.TLS_CERT_FILE or not cls.TLS_KEY_FILE:
+                errors.append("TLS_CERT_FILE and TLS_KEY_FILE are required when SMTP_RELAY_USE_TLS is enabled")
+            else:
+                cert_path = Path(cls.TLS_CERT_FILE)
+                key_path = Path(cls.TLS_KEY_FILE)
+                if not cert_path.exists():
+                    errors.append(f"TLS certificate file not found: {cls.TLS_CERT_FILE}")
+                if not key_path.exists():
+                    errors.append(f"TLS key file not found: {cls.TLS_KEY_FILE}")
         
         # Production-specific validations
         if cls.ENVIRONMENT == 'production':
             if cls.LOG_LEVEL == 'DEBUG':
                 errors.append("LOG_LEVEL should not be 'DEBUG' in production")
-            
+            # TLS is now always enabled in production, so this check is redundant but kept for clarity
+            if not cls.SMTP_RELAY_USE_TLS:
+                errors.append("CRITICAL: TLS must be enabled in production mode (this should never happen)")
+        else:
+            # Development mode warning
+            if not cls.SMTP_RELAY_USE_TLS:
+                print(f"WARNING: Running in development mode without TLS enabled. Connections will not be encrypted.")
+        
         if errors:
             raise ValueError(f"Configuration errors:\n  - " + "\n  - ".join(errors))
         

@@ -28,8 +28,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 SMTP_SERVER = "localhost"
 SMTP_PORT_SSL = 465
 SMTP_PORT_STARTTLS = 587
-USERNAME = "your.username"
-PASSWORD = "your.password"
+USERNAME = "yourusername"
+PASSWORD = "yourpassword"
 FROM_EMAIL = "sender@example.com"
 
 # Terminal colors

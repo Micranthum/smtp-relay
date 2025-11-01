@@ -14,21 +14,21 @@ from datetime import datetime
 from pathlib import Path
 
 # Configuration - ADJUST ACCORDING TO YOUR ENVIRONMENT
-SMTP_SERVER = "localhost"  # or the IP/domain of your server
-SMTP_PORT = 587
-SMTP_USERNAME = "your.username"  # SMTP_RELAY_USERNAME value
-SMTP_PASSWORD = "your_password"  # SMTP_RELAY_PASSWORD value
+SMTP_SERVER = "smtp.aguafria.mx"  # or the IP/domain of your server
+SMTP_PORT = 465 # Use 587 for development without TLS, 465 for production with SSL
+USE_TLS = True # Set to True if TLS is enabled on the server
+SMTP_USERNAME = "contpaq.nominas@aguafria.mx"  # SMTP_RELAY_USERNAME value
+SMTP_PASSWORD = "Ksh456Ljd953e1gg5r6yyu1"  # SMTP_RELAY_PASSWORD value
 
 # Test email
-FROM_EMAIL = "sender@example.com"
-TO_EMAIL = "recipient@example.com"
-SUBJECT = f"Test SMTP Relay with Attachments - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+FROM_EMAIL = "contpaq.nominas@aguafria.mx"
+TO_EMAIL = "nadeen37@2200freefonts.com"
+SUBJECT = f"Test SMTP Relay with Attachment - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 
 # Test attachment files
 SCRIPT_DIR = Path(__file__).parent
-TEST_DIR = SCRIPT_DIR / "test"
 ATTACHMENTS = [
-    TEST_DIR / "recibo_ejemplo.pdf",
+    SCRIPT_DIR / "recibo_ejemplo.pdf",
 ]
 
 def send_test_email():
@@ -46,14 +46,13 @@ def send_test_email():
         
         # Email content
         text = """
-        This is a test email from the SMTP Relay with attachments.
+        This is a test email from the SMTP Relay with attachment.
         
-        If you receive this message with the attachments (PDF and XML), it means the relay
+        If you receive this message with the attachment (PDF), it means the relay
         is working correctly and can send payroll receipts.
         
-        Included attachments:
+        Included attachment:
         - recibo_ejemplo.pdf (Sample payroll receipt)
-        - factura_ejemplo.xml (Electronic invoice CFDI)
         
         System: SMTP Relay - Contpaq to Microsoft 365
         Time: {time}
@@ -63,13 +62,12 @@ def send_test_email():
         <html>
           <body>
             <h2>Test Email - SMTP Relay</h2>
-            <p>This is a test email from the <strong>SMTP Relay</strong> with attachments.</p>
-            <p>If you receive this message with the attachments, it means the relay is working correctly.</p>
+            <p>This is a test email from the <strong>SMTP Relay</strong> with attachment.</p>
+            <p>If you receive this message with the attachment, it means the relay is working correctly.</p>
             
-            <h3>Attachments:</h3>
+            <h3>Attachment:</h3>
             <ul>
               <li><strong>recibo_ejemplo.pdf</strong> - Sample payroll receipt</li>
-              <li><strong>factura_ejemplo.xml</strong> - Electronic invoice CFDI</li>
             </ul>
             
             <hr>
@@ -115,22 +113,32 @@ def send_test_email():
         if not attachments_found:
             print("\nNo attachment files found. Creating sample files...")
             # Execute the PDF creation script if files don't exist
-            create_script = TEST_DIR / "crear_pdf_ejemplo.py"
+            create_script = SCRIPT_DIR / "crear_pdf_ejemplo.py"
             if create_script.exists():
                 import subprocess
-                subprocess.run(['python3', str(create_script)], cwd=str(TEST_DIR))
+                subprocess.run(['python3', str(create_script)], cwd=str(SCRIPT_DIR))
                 print("   Run the script again to include attachments.")
                 return
         
         # Connect and send
         print(f"\nConnecting to {SMTP_SERVER}:{SMTP_PORT}...")
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.set_debuglevel(1)  # Show debug info
         
-        # For local relay, don't use STARTTLS
-        # If you need TLS, uncomment the following line:
-        # print("Starting STARTTLS...")
-        # server.starttls()
+        if USE_TLS and SMTP_PORT == 465:
+            # Use SMTP_SSL for port 465 with TLS enabled (implicit SSL)
+            print("Using implicit SSL/TLS (port 465)...")
+            server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
+            server.set_debuglevel(1)
+        elif USE_TLS and SMTP_PORT == 587:
+            # Use SMTP with STARTTLS for port 587 with TLS enabled
+            print("Using STARTTLS (port 587)...")
+            server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+            server.set_debuglevel(1)
+            server.starttls()
+        else:
+            # Plain SMTP without TLS (development mode)
+            print("Using plain SMTP (no encryption - development only)...")
+            server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+            server.set_debuglevel(1)
         
         print(f"Authenticating as {SMTP_USERNAME}...")
         server.login(SMTP_USERNAME, SMTP_PASSWORD)

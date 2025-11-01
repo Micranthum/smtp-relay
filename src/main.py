@@ -27,22 +27,27 @@ class SMTPRelayServer:
             
             # Log environment info
             logger.info(f"Environment: {Config.ENVIRONMENT}")
+            logger.info(f"TLS Enabled: {Config.SMTP_RELAY_USE_TLS}")
             logger.info(f"IP Whitelist: {Config.ALLOWED_IPS}")
             logger.info(f"Sender Whitelist: {Config.ALLOWED_SENDERS}")
             logger.info(f"Rate Limit: {Config.RATE_LIMIT_PER_MINUTE} emails/minute")
             
-            # Create TLS context for both servers
-            logger.info("Creating TLS context...")
-            try:
-                tls_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-                tls_context.load_cert_chain(
-                    certfile=Config.TLS_CERT_FILE,
-                    keyfile=Config.TLS_KEY_FILE
-                )
-                logger.info("Success: TLS context created successfully")
-            except Exception as e:
-                logger.error(f"Error: Failed to create TLS context: {e}")
-                raise
+            # Create TLS context if enabled
+            tls_context = None
+            if Config.SMTP_RELAY_USE_TLS:
+                logger.info("Creating TLS context...")
+                try:
+                    tls_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                    tls_context.load_cert_chain(
+                        certfile=Config.TLS_CERT_FILE,
+                        keyfile=Config.TLS_KEY_FILE
+                    )
+                    logger.info("Success: TLS context created successfully")
+                except Exception as e:
+                    logger.error(f"Error: Failed to create TLS context: {e}")
+                    raise
+            else:
+                logger.warning("TLS is DISABLED - connections will NOT be encrypted!")
             
             # Create handlers for both servers
             handler_starttls = SMTPRelayHandler()
@@ -50,12 +55,19 @@ class SMTPRelayServer:
             
             # Create STARTTLS controller (port 587)
             logger.info(f"Setting up STARTTLS server on port {Config.SMTP_STARTTLS_PORT}...")
+            # In production with TLS, require STARTTLS; in development allow plain connections
+            require_starttls = Config.SMTP_RELAY_USE_TLS and Config.ENVIRONMENT == 'production'
+            if require_starttls:
+                logger.info("  STARTTLS will be REQUIRED for all connections")
+            else:
+                logger.info("  STARTTLS is OPTIONAL (development mode or TLS disabled)")
+            
             self.controller_starttls = AuthenticatedSMTPController(
                 handler_starttls,
                 hostname=Config.SMTP_RELAY_HOST,
                 port=Config.SMTP_STARTTLS_PORT,
                 tls_context=tls_context,
-                require_starttls=False,  # Optional STARTTLS
+                require_starttls=require_starttls,
             )
             
             # Create SSL/TLS controller (port 465) with implicit TLS
@@ -70,8 +82,8 @@ class SMTPRelayServer:
             # Start servers
             logger.info("=" * 70)
             logger.info(f"Starting SMTP Relay Servers:")
-            logger.info(f"STARTTLS on {Config.SMTP_RELAY_HOST}:{Config.SMTP_STARTTLS_PORT}")
-            logger.info(f"SSL/TLS on {Config.SMTP_RELAY_HOST}:{Config.SMTP_SSL_PORT}")
+            logger.info(f"STARTTLS on {Config.SMTP_RELAY_HOST}:{Config.SMTP_STARTTLS_PORT} (TLS: {'enabled' if tls_context else 'disabled'})")
+            logger.info(f"SSL/TLS on {Config.SMTP_RELAY_HOST}:{Config.SMTP_SSL_PORT} (TLS: {'enabled' if tls_context else 'disabled'})")
             logger.info(f"Relay target: Microsoft Graph API")
             logger.info(f"Using email address: {Config.MS365_EMAIL_ADDRESS}")
             logger.info("=" * 70)
@@ -80,9 +92,14 @@ class SMTPRelayServer:
             self.controller_ssl.start()
 
             logger.info("Success: Both SMTP servers started")
-            logger.info("Ready to accept connections:")
-            logger.info("  - Modern clients: use port 587 with STARTTLS")
-            logger.info("  - Legacy clients: use port 465 with SSL/TLS")
+            if tls_context:
+                logger.info("Ready to accept secure connections:")
+                logger.info("  - Modern clients: use port 587 with STARTTLS")
+                logger.info("  - Legacy clients: use port 465 with SSL/TLS")
+            else:
+                logger.warning("Ready to accept INSECURE connections (TLS disabled):")
+                logger.warning("  - Port 587 (STARTTLS available but optional)")
+                logger.warning("  - Port 465 (no encryption)")
             
             # Keep running
             try:
