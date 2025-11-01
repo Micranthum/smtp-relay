@@ -14,7 +14,8 @@ class SMTPRelayServer:
     """Main SMTP Relay Server"""
     
     def __init__(self):
-        self.controller = None
+        self.controller_starttls = None
+        self.controller_ssl = None
         
     def start(self):
         """Start the SMTP relay server"""
@@ -26,73 +27,63 @@ class SMTPRelayServer:
             
             # Log environment info
             logger.info(f"Environment: {Config.ENVIRONMENT}")
-            logger.info(f"Encryption Mode: {Config.SMTP_ENCRYPTION_MODE}")
-            logger.info(f"TLS Enabled: {Config.SMTP_RELAY_USE_TLS}")
             logger.info(f"IP Whitelist: {Config.ALLOWED_IPS}")
             logger.info(f"Sender Whitelist: {Config.ALLOWED_SENDERS}")
             logger.info(f"Rate Limit: {Config.RATE_LIMIT_PER_MINUTE} emails/minute")
             
-            # Create TLS context based on encryption mode
-            tls_context = None
-            require_starttls = False
+            # Create TLS context for both servers
+            logger.info("Creating TLS context...")
+            try:
+                tls_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                tls_context.load_cert_chain(
+                    certfile=Config.TLS_CERT_FILE,
+                    keyfile=Config.TLS_KEY_FILE
+                )
+                logger.info("✅ TLS context created successfully")
+            except Exception as e:
+                logger.error(f"❌ Failed to create TLS context: {e}")
+                raise
             
-            if Config.SMTP_ENCRYPTION_MODE == 'SSL':
-                # SSL mode: implicit TLS from connection start (like port 465)
-                try:
-                    tls_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-                    tls_context.load_cert_chain(
-                        certfile=Config.TLS_CERT_FILE,
-                        keyfile=Config.TLS_KEY_FILE
-                    )
-                    require_starttls = False  # No STARTTLS command, TLS is implicit
-                    logger.info("✅ SSL mode: TLS context created (implicit TLS)")
-                except Exception as e:
-                    logger.error(f"❌ Failed to create TLS context for SSL mode: {e}")
-                    raise
-                    
-            elif Config.SMTP_ENCRYPTION_MODE == 'STARTTLS':
-                # STARTTLS mode: optional upgrade to TLS after connection
-                if Config.SMTP_RELAY_USE_TLS:
-                    try:
-                        tls_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-                        tls_context.load_cert_chain(
-                            certfile=Config.TLS_CERT_FILE,
-                            keyfile=Config.TLS_KEY_FILE
-                        )
-                        require_starttls = False  # Don't require, but offer STARTTLS
-                        logger.info("✅ STARTTLS mode: TLS context created (optional upgrade)")
-                    except Exception as e:
-                        logger.error(f"❌ Failed to create TLS context for STARTTLS mode: {e}")
-                        raise
-                else:
-                    logger.info("⚠️  STARTTLS mode: TLS disabled (plain text connections)")
-                    
-            elif Config.SMTP_ENCRYPTION_MODE == 'NONE':
-                # No encryption
-                logger.warning("⚠️  WARNING: No encryption enabled - connections will be in plain text!")
-                logger.warning("⚠️  This is NOT recommended for production use!")
+            # Create handlers for both servers
+            handler_starttls = SMTPRelayHandler()
+            handler_ssl = SMTPRelayHandler()
             
-            # Create handler
-            handler = SMTPRelayHandler()
-            
-            # Create controller
-            self.controller = AuthenticatedSMTPController(
-                handler,
+            # Create STARTTLS controller (port 587)
+            logger.info(f"Setting up STARTTLS server on port {Config.SMTP_STARTTLS_PORT}...")
+            self.controller_starttls = AuthenticatedSMTPController(
+                handler_starttls,
                 hostname=Config.SMTP_RELAY_HOST,
-                port=Config.SMTP_RELAY_PORT,
+                port=Config.SMTP_STARTTLS_PORT,
                 tls_context=tls_context,
-                require_starttls=require_starttls,
+                require_starttls=False,  # Optional STARTTLS
             )
             
-            # Start server
-            logger.info(f"Starting SMTP Relay Server on {Config.SMTP_RELAY_HOST}:{Config.SMTP_RELAY_PORT}")
+            # Create SSL/TLS controller (port 465)
+            logger.info(f"Setting up SSL server on port {Config.SMTP_SSL_PORT}...")
+            self.controller_ssl = AuthenticatedSMTPController(
+                handler_ssl,
+                hostname=Config.SMTP_RELAY_HOST,
+                port=Config.SMTP_SSL_PORT,
+                tls_context=tls_context,
+                require_starttls=False,  # Implicit TLS, no STARTTLS needed
+            )
+            
+            # Start servers
+            logger.info("=" * 70)
+            logger.info(f"Starting SMTP Relay Servers:")
+            logger.info(f"  📬 STARTTLS on {Config.SMTP_RELAY_HOST}:{Config.SMTP_STARTTLS_PORT}")
+            logger.info(f"  🔒 SSL/TLS on {Config.SMTP_RELAY_HOST}:{Config.SMTP_SSL_PORT}")
             logger.info(f"Relay target: Microsoft Graph API")
             logger.info(f"Using email address: {Config.MS365_EMAIL_ADDRESS}")
+            logger.info("=" * 70)
             
-            self.controller.start()
+            self.controller_starttls.start()
+            self.controller_ssl.start()
             
-            logger.info("SMTP Relay Server started successfully")
-            logger.info("Ready to accept connections from Contpaq")
+            logger.info("✅ Both SMTP servers started successfully")
+            logger.info("Ready to accept connections:")
+            logger.info("  - Modern clients: use port 587 with STARTTLS")
+            logger.info("  - Legacy clients: use port 465 with SSL/TLS")
             
             # Keep running
             try:
@@ -110,10 +101,14 @@ class SMTPRelayServer:
     
     def stop(self):
         """Stop the SMTP relay server"""
-        if self.controller:
-            logger.info("Stopping SMTP Relay Server...")
-            self.controller.stop()
-            logger.info("Server stopped")
+        logger.info("Stopping SMTP Relay Servers...")
+        if self.controller_starttls:
+            self.controller_starttls.stop()
+            logger.info("STARTTLS server stopped")
+        if self.controller_ssl:
+            self.controller_ssl.stop()
+            logger.info("SSL server stopped")
+        logger.info("All servers stopped")
 
 
 def signal_handler(signum, frame):

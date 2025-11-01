@@ -16,15 +16,10 @@ class Config:
     
     # SMTP Relay Server Configuration
     SMTP_RELAY_HOST = os.getenv('SMTP_RELAY_HOST', '0.0.0.0')
-    SMTP_RELAY_PORT = int(os.getenv('SMTP_RELAY_PORT', '587'))
-    SMTP_RELAY_USE_TLS = os.getenv('SMTP_RELAY_USE_TLS', 'false').lower() == 'true'
     
-    # SMTP Encryption Mode Configuration
-    # Options: STARTTLS (default), SSL (implicit TLS), NONE (no encryption)
-    # STARTTLS: Connection starts plain, upgraded to TLS (port 587)
-    # SSL: Connection uses TLS from the start (port 465) - for legacy clients
-    # NONE: No encryption (not recommended, only for testing)
-    SMTP_ENCRYPTION_MODE = os.getenv('SMTP_ENCRYPTION_MODE', 'STARTTLS').upper()
+    # Dual server setup: STARTTLS on 587 and SSL on 465
+    SMTP_STARTTLS_PORT = 587  # Modern clients
+    SMTP_SSL_PORT = 465        # Legacy clients
     
     # TLS/SSL Certificate Configuration (optional, for production)
     TLS_CERT_FILE = os.getenv('TLS_CERT_FILE', '')  # Path to certificate file
@@ -81,32 +76,21 @@ class Config:
         if not cls.MS365_EMAIL_ADDRESS:
             errors.append("MS365_EMAIL_ADDRESS is required")
         
-        # Validate SMTP encryption mode
-        valid_encryption_modes = ['STARTTLS', 'SSL', 'NONE']
-        if cls.SMTP_ENCRYPTION_MODE not in valid_encryption_modes:
-            errors.append(f"SMTP_ENCRYPTION_MODE must be one of: {', '.join(valid_encryption_modes)}")
+        # TLS Certificate validation (required for both servers)
+        if not cls.TLS_CERT_FILE or not cls.TLS_KEY_FILE:
+            errors.append("TLS_CERT_FILE and TLS_KEY_FILE are required")
+        elif cls.TLS_CERT_FILE and cls.TLS_KEY_FILE:
+            cert_path = Path(cls.TLS_CERT_FILE)
+            key_path = Path(cls.TLS_KEY_FILE)
+            if not cert_path.exists():
+                errors.append(f"TLS certificate file not found: {cls.TLS_CERT_FILE}")
+            if not key_path.exists():
+                errors.append(f"TLS key file not found: {cls.TLS_KEY_FILE}")
         
         # Production-specific validations
         if cls.ENVIRONMENT == 'production':
-            # Note: Removed restriction on ALLOWED_IPS='*' - allow if user explicitly configures it
-            # Note: ALLOWED_SENDERS can be '*' if you control access via IP whitelist
             if cls.LOG_LEVEL == 'DEBUG':
                 errors.append("LOG_LEVEL should not be 'DEBUG' in production")
-        
-        # TLS Certificate validation (if SSL or STARTTLS mode is used)
-        if cls.SMTP_ENCRYPTION_MODE in ['SSL', 'STARTTLS']:
-            # For STARTTLS mode, TLS is optional (controlled by SMTP_RELAY_USE_TLS)
-            # For SSL mode, TLS certificate is required
-            if cls.SMTP_ENCRYPTION_MODE == 'SSL' or cls.SMTP_RELAY_USE_TLS:
-                if not cls.TLS_CERT_FILE or not cls.TLS_KEY_FILE:
-                    errors.append("TLS_CERT_FILE and TLS_KEY_FILE are required when using SSL mode or SMTP_RELAY_USE_TLS=true")
-                elif cls.TLS_CERT_FILE and cls.TLS_KEY_FILE:
-                    cert_path = Path(cls.TLS_CERT_FILE)
-                    key_path = Path(cls.TLS_KEY_FILE)
-                    if not cert_path.exists():
-                        errors.append(f"TLS certificate file not found: {cls.TLS_CERT_FILE}")
-                    if not key_path.exists():
-                        errors.append(f"TLS key file not found: {cls.TLS_KEY_FILE}")
             
         if errors:
             raise ValueError(f"Configuration errors:\n  - " + "\n  - ".join(errors))
