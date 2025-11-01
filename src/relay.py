@@ -330,7 +330,8 @@ class SSLSMTPController(Controller):
     def __init__(self, handler, tls_context=None, **kwargs):
         self.handler_instance = handler
         self.tls_context = tls_context
-        super().__init__(handler, **kwargs)
+        # Pass ssl_context to parent Controller - it handles SSL implicitly
+        super().__init__(handler, ssl_context=tls_context, **kwargs)
     
     def factory(self):
         """Create SMTP server instance with authentication (no STARTTLS for SSL mode)"""
@@ -384,48 +385,6 @@ class SSLSMTPController(Controller):
         else:
             logger.warning(f"Failed authentication attempt for user: {username}")
             return AuthResult(success=False, handled=True)
-    
-    async def _create_server(self, loop):
-        """Create the server with SSL wrapping"""
-        server = await loop.create_server(
-            self.factory,
-            host=self.hostname,
-            port=self.port,
-            ssl=self.tls_context,
-        )
-        # Start serving immediately
-        await server.start_serving()
-        return server
-    
-    def _run(self, ready_event):
-        """Override to support SSL mode"""
-        import asyncio
-        
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        self.loop = loop
-        
-        try:
-            # Create and start the server
-            self.server = loop.run_until_complete(self._create_server(loop))
-            
-            # Give it a moment to start listening
-            loop.run_until_complete(asyncio.sleep(0.5))
-            
-            # Signal that we're ready
-            ready_event.set()
-        except Exception as error:
-            ready_event.set()
-            raise error
-        
-        try:
-            loop.run_forever()
-        except KeyboardInterrupt:
-            pass
-        finally:
-            self.server.close()
-            loop.run_until_complete(self.server.wait_closed())
-            loop.close()
     
     def _authenticate(self, server, session, envelope, mechanism, auth_data):
         """Authentication callback for SMTP server"""
