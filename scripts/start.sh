@@ -1,14 +1,12 @@
 #!/bin/bash
 
-# Script de inicio para verificar configuración antes de ejecutar
-
 echo "=========================================="
-echo "SMTP Relay - Contpaq to Microsoft 365"
+echo "SMTP Relay - Basic Auth to OAuth2 Microsoft Graph"
 echo "Environment: ${ENVIRONMENT:-development}"
 echo "=========================================="
 echo ""
 
-# Verificar variables de entorno requeridas
+
 REQUIRED_VARS=(
     "SMTP_RELAY_USERNAME"
     "SMTP_RELAY_PASSWORD"
@@ -27,20 +25,19 @@ for var in "${REQUIRED_VARS[@]}"; do
 done
 
 if [ ${#MISSING_VARS[@]} -ne 0 ]; then
-    echo "ERROR: Variables de entorno faltantes:"
+    echo "ERROR: Missing environment variables:"
     for var in "${MISSING_VARS[@]}"; do
         echo "  - $var"
     done
     echo ""
-    echo "Por favor, configura estas variables en tu archivo .env"
+    echo "Please configure these variables in your .env file"
     exit 1
 fi
 
-echo "Todas las variables de entorno están configuradas"
+echo "All required environment variables are set"
 echo ""
 
 echo "Starting SMTP Relay server..."
 echo ""
 
-# Ejecutar la aplicación como módulo
 exec python -u -m src.main

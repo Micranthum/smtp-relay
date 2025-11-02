@@ -35,3 +35,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Run the application via entrypoint
 ENTRYPOINT ["./entrypoint.sh"]
+CMD ["./start.sh"]

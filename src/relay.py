@@ -1,6 +1,6 @@
 """
 SMTP Relay Server Handler
-Accepts connections from Contpaq with basic auth and relays to Microsoft 365 via Graph API
+Accepts connections from basic auth and relays to Microsoft 365 via Graph API
 """
 import base64
 import requests

@@ -1,6 +1,6 @@
 """
 SMTP Relay Server - Main Entry Point
-Bridges Contpaq (Basic Auth) with Microsoft 365 (OAuth2)
+Bridges Basic Auth to Graph API's auth (OAuth2)
 """
 import asyncio
 import signal
@@ -141,8 +141,7 @@ def main():
     
     # Print banner
     logger.info("=" * 60)
-    logger.info("SMTP Relay Server - Contpaq to Microsoft 365")
-    logger.info("Bridging Basic Auth to OAuth2")
+    logger.info("SMTP Relay Server - Basic Auth to OAuth2")
     logger.info("=" * 60)
     
     # Start server

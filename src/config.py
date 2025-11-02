@@ -12,7 +12,7 @@ class Config:
     """Configuration class for SMTP Relay"""
     
     # Environment Configuration
-    ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')  # development or production
+    ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
     
     # SMTP Relay Server Configuration
     SMTP_RELAY_HOST = os.getenv('SMTP_RELAY_HOST', '0.0.0.0')
@@ -41,6 +41,11 @@ class Config:
     GRAPH_API_CLIENT_ID = os.getenv('GRAPH_API_CLIENT_ID', '')
     GRAPH_API_CLIENT_SECRET = os.getenv('GRAPH_API_CLIENT_SECRET', '')
     MS365_EMAIL_ADDRESS = os.getenv('MS365_EMAIL_ADDRESS', '')
+    
+    # Microsoft Graph API Endpoints
+    GRAPH_API_AUTHORITY_BASE = os.getenv('GRAPH_API_AUTHORITY_BASE', 'https://login.microsoftonline.com')
+    GRAPH_API_ENDPOINT = os.getenv('GRAPH_API_ENDPOINT', 'https://graph.microsoft.com/v1.0')
+    GRAPH_API_SCOPE = os.getenv('GRAPH_API_SCOPE', 'https://graph.microsoft.com/.default')
     
     # Security - IP Whitelist
     ALLOWED_IPS = os.getenv('ALLOWED_IPS', '*')
