@@ -12,19 +12,19 @@ class MS365OAuth:
     """Handle OAuth2 authentication with Microsoft 365"""
     
     def __init__(self):
-        self.tenant_id = Config.MS365_TENANT_ID
-        self.client_id = Config.MS365_CLIENT_ID
-        self.client_secret = Config.MS365_CLIENT_SECRET
+        self.tenant_id = Config.GRAPH_API_TENANT_ID
+        self.client_id = Config.GRAPH_API_CLIENT_ID
+        self.client_secret = Config.GRAPH_API_CLIENT_SECRET
         self.email_address = Config.MS365_EMAIL_ADDRESS
         
         # OAuth2 scopes for Microsoft Graph API (using Mail.Send application permission)
-        self.scopes = ['https://graph.microsoft.com/.default']
+        self.scopes = [Config.GRAPH_API_SCOPE]
         
         # Authority URL
-        self.authority = f'https://login.microsoftonline.com/{self.tenant_id}'
+        self.authority = f'{Config.GRAPH_API_AUTHORITY_BASE}/{self.tenant_id}'
         
         # Graph API endpoint
-        self.graph_endpoint = 'https://graph.microsoft.com/v1.0'
+        self.graph_endpoint = Config.GRAPH_API_ENDPOINT
         
         # Token cache file
         self.token_cache_file = Path('token_cache') / 'ms365_token.json'
@@ -87,16 +87,29 @@ class MS365OAuth:
         return datetime.now() < self._token_expiry
     
     def _save_token_to_file(self, token_response):
-        """Save token to file cache"""
+        """Save token to file cache with secure permissions"""
         try:
             cache_data = {
                 'access_token': token_response['access_token'],
                 'expires_in': token_response.get('expires_in', 3600),
                 'timestamp': datetime.now().isoformat(),
             }
-            with open(self.token_cache_file, 'w') as f:
+            
+            # Write with restrictive permissions
+            self.token_cache_file.parent.mkdir(mode=0o700, exist_ok=True)
+            
+            # Write atomically using temp file
+            temp_file = self.token_cache_file.with_suffix('.tmp')
+            with open(temp_file, 'w') as f:
                 json.dump(cache_data, f)
-            logger.debug("Token saved to file cache")
+            
+            # Set restrictive permissions before moving
+            temp_file.chmod(0o600)
+            
+            # Atomic rename
+            temp_file.replace(self.token_cache_file)
+            
+            logger.debug("Token saved to file cache with secure permissions (0600)")
         except Exception as e:
             logger.warning(f"Failed to save token to cache: {e}")
     

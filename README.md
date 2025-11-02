@@ -1,342 +1,305 @@
-# SMTP Relay - Contpaq a Microsoft 365
+# SMTP Relay - Basic Auth to Microsoft 365 OAuth2
 
-Servidor SMTP relay seguro que actúa como puente entre Contpaq (que solo soporta autenticación básica) y Microsoft 365 (que requiere OAuth2).
+A production-ready SMTP relay server that bridges legacy applications using Basic Authentication with Microsoft 365's modern OAuth2 authentication via Microsoft Graph API.
 
-## 🎯 Características
+## Overview
 
-- ✅ **Autenticación híbrida**: Acepta Basic Auth de Contpaq y se autentica con OAuth2 en Microsoft 365
-- ✅ **Microsoft Graph API**: Usa Graph API para envío confiable (compatible con buzones compartidos)
-- ✅ **Seguro**: Contenedor Docker con usuario no-root, TLS/SSL, y variables de entorno separadas
-- ✅ **Listo para producción**: Logging robusto, health checks, rate limiting
-- ✅ **Caché de tokens**: Almacenamiento persistente de tokens OAuth2 para mejor rendimiento
-- ✅ **Rate limiting**: Protección contra abuso (configurable)
-- ✅ **Logs estructurados**: Logging con colores para desarrollo y archivos para producción
-- ✅ **Soporte de adjuntos**: Envío de PDFs, XMLs y otros archivos adjuntos
+This SMTP relay server enables legacy applications that only support basic SMTP authentication to send emails through Microsoft 365 accounts, which require OAuth2 authentication. The relay acts as an intermediary, accepting basic auth credentials and forwarding emails using Microsoft Graph API with OAuth2 tokens.
 
-## 📋 Requisitos Previos
+## Architecture
 
-### 1. Docker y Docker Compose
-```bash
-docker --version
-docker-compose --version
+### Core Components
+
+```
+smtp-relay/
+├── src/                    # Core application source code
+│   ├── __init__.py
+│   ├── main.py            # Application entry point and server setup
+│   ├── relay.py           # SMTP server handlers and controllers
+│   ├── oauth.py           # Microsoft OAuth2 authentication handler
+│   ├── config.py          # Configuration management
+│   └── logger.py          # Logging configuration
+├── test/                  # Test scripts
+│   ├── test_email.py      # Single email test with attachment
+│   └── test_mass_email.py # Bulk email testing
+├── scripts/               # Docker and startup scripts
+│   ├── entrypoint.sh      # Docker container entrypoint
+│   └── start.sh           # Application startup script
+├── certs/                 # TLS/SSL certificates (production)
+├── logs/                  # Application logs
+├── token_cache/           # OAuth2 token cache
+├── docker-compose.yml     # Docker compose configuration
+├── Dockerfile            # Docker image definition
+├── requirements.txt      # Python dependencies
 ```
 
-### 2. Aplicación Azure AD (Microsoft 365)
+### Module Descriptions
 
-Necesitas crear una aplicación en Azure AD para obtener las credenciales OAuth2:
+#### src/main.py
+Main application entry point. Initializes and starts dual SMTP servers:
+- Port 587: STARTTLS server (optional encryption in development, mandatory in production)
+- Port 465: SSL/TLS server (implicit encryption when TLS is enabled)
 
-1. Ir a [Azure Portal](https://portal.azure.com)
-2. Navegar a **Azure Active Directory** → **App registrations** → **New registration**
-3. Configurar la aplicación:
-   - **Name**: `SMTP Relay Contpaq`
-   - **Supported account types**: Accounts in this organizational directory only
-   - **Redirect URI**: No necesario para esta aplicación
-4. Después de crear, copiar:
-   - **Application (client) ID**
-   - **Directory (tenant) ID**
-5. Crear un **Client Secret**:
-   - Ir a **Certificates & secrets** → **New client secret**
-   - Descripción: `SMTP Relay Secret`
-   - Expiration: 24 months (o según política de tu organización)
-   - **Copiar el valor del secret** (solo se muestra una vez)
-6. Configurar permisos API:
-   - Ir a **API permissions** → **Add a permission**
-   - Seleccionar **Microsoft Graph** → **Application permissions**
-   - Agregar: `Mail.Send`
-   - Hacer clic en **Grant admin consent** para tu organización
+Validates configuration, creates TLS contexts, and manages server lifecycle.
 
-## 🚀 Instalación
+#### src/relay.py
+SMTP protocol handlers and server controllers. Contains:
+- `SMTPRelayHandler`: Handles SMTP commands (RCPT, DATA) and relays messages via Graph API
+- `RateLimiter`: Implements rate limiting per sender
+- `AuthenticatedSMTPController`: STARTTLS server controller with authentication
+- `SSLSMTPController`: SSL/TLS server controller for implicit encryption
+- `AuthenticatedSMTP`: Custom SMTP server with authentication support
 
-### 1. Clonar o copiar el proyecto
+#### src/oauth.py
+Microsoft 365 OAuth2 authentication manager. Handles:
+- Token acquisition using client credentials flow
+- Token caching and automatic refresh
+- Microsoft Graph API endpoint configuration (configurable for sovereign clouds)
+- Application-level permissions (Mail.Send)
 
+#### src/config.py
+Centralized configuration management. Loads settings from environment variables:
+- SMTP server configuration (host, ports)
+- TLS/SSL settings (auto-configured based on environment)
+- Microsoft Graph API credentials and endpoints
+- Security settings (IP whitelist, sender whitelist)
+- Rate limiting and logging configuration
+
+Enforces security policies:
+- TLS is mandatory in production
+- Certificate validation
+- Environment-specific defaults
+
+#### src/logger.py
+Logging configuration using Python's logging module. Features:
+- Rotating file handler (10MB max, 5 backup files)
+- Console output with color-coded levels
+- Structured log format with timestamps
+- Environment-based log levels (DEBUG in development, INFO in production)
+
+## Features
+
+### Dual SMTP Server Support
+- **Port 587 (STARTTLS)**: Modern email clients with optional/required encryption
+- **Port 465 (SSL/TLS)**: Legacy clients with implicit SSL encryption
+
+### Security
+- **Environment-based TLS enforcement**: Mandatory in production, optional in development
+- **IP Whitelist**: Restrict connections by source IP address
+- **Sender Whitelist**: Control which email addresses can send through the relay
+- **Rate Limiting**: Prevent abuse with configurable rate limits
+- **OAuth2 Token Management**: Secure token storage and automatic refresh
+
+### Microsoft Graph API Integration
+- Application-level permissions
+- Automatic token refresh
+- Full email support (HTML, attachments, multiple recipients)
+- Sent items saved to Microsoft 365 mailbox
+
+### Operational Features
+- Docker containerization
+- Health checks
+- Structured logging
+- Automatic permission management for mounted volumes
+- Environment variable validation on startup
+
+## Requirements
+
+### System Requirements
+- Docker and Docker Compose
+- Linux or WSL host
+
+### Microsoft 365 Requirements
+- Entra ID application registration
+- Application permissions: `Mail.Send`
+- Admin consent granted
+- Client credentials (Tenant ID, Client ID, Client Secret)
+
+## Installation
+
+### 1. Clone the Repository
 ```bash
+git clone <repository-url>
 cd smtp-relay
 ```
 
-### 2. Configurar variables de entorno
+### 2. Configure Environment Variables
 
+Copy the example environment file:
 ```bash
 cp .env.example .env
 ```
 
-Editar `.env` con tus credenciales:
+### 3. TLS Certificates (Production)
+
+For production deployment, generate or obtain SSL/TLS certificates:
 
 ```bash
-nano .env
+# Self-signed certificate (for testing)
+openssl req -x509 -newkey rsa:4096 -keyout certs/smtp_relay.key \
+  -out certs/smtp_relay.crt -days 365 -nodes \
+  -subj "/CN=smtp.yourdomain.com"
+
+# Set proper permissions
+chmod 600 certs/smtp_relay.key
+chmod 644 certs/smtp_relay.crt
 ```
 
-**Configuración mínima requerida:**
+For production, use certificates from a trusted CA (Let's Encrypt, DigiCert, etc.).
 
-```env
-# Credenciales para Contpaq (crear nuevas, no usar las de Microsoft 365)
-SMTP_RELAY_USERNAME=contpaq_smtp
-SMTP_RELAY_PASSWORD=TuPasswordSeguro123!
+### 4. Entra ID Application Setup
 
-# Credenciales de Azure AD (obtenidas en el paso anterior)
-MS365_TENANT_ID=tu-tenant-id-aqui
-MS365_CLIENT_ID=tu-client-id-aqui
-MS365_CLIENT_SECRET=tu-client-secret-aqui
-MS365_EMAIL_ADDRESS=noreply@tudominio.com
-```
+1. Register a new application in Entra ID
+2. Configure API permissions:
+   - Microsoft Graph > Application permissions > Mail.Send
+3. Grant admin consent
+4. Create a client secret
+5. Note the Tenant ID, Client ID, and Client Secret
 
-**Configuración adicional (opcional):**
-
-```env
-# Restringir remitentes permitidos (por seguridad)
-ALLOWED_SENDERS=nominas@tudominio.com,rh@tudominio.com
-
-# Rate limiting (emails por minuto)
-RATE_LIMIT_PER_MINUTE=60
-
-# Nivel de logs
-LOG_LEVEL=INFO
-```
-
-### 3. Construir y ejecutar
+### 5. Build and Start
 
 ```bash
-# Construir la imagen
-docker-compose build
+# Build the Docker image
+docker compose build
 
-# Iniciar el servicio
-docker-compose up -d
+# Start the service
+docker compose up -d
 
-# Ver logs
-docker-compose logs -f
+# View logs
+docker compose logs -f
 ```
 
-## 🔧 Configuración de Contpaq
+## Usage
 
-Configurar Contpaq para usar el SMTP relay:
+### Sending Emails via the Relay
 
-1. **Servidor SMTP**: `tu-servidor.com` o `localhost` (si está en la misma máquina)
-2. **Puerto**: `587`
-3. **Seguridad/TLS**: Activado (STARTTLS)
-4. **Autenticación**: Básica/Simple
-5. **Usuario**: El valor de `SMTP_RELAY_USERNAME` (ej: `contpaq_smtp`)
-6. **Contraseña**: El valor de `SMTP_RELAY_PASSWORD`
+Configure your application to use the SMTP relay:
 
-## 📊 Monitoreo
+**Connection Settings:**
+- **Server**: localhost (or your server's IP/domain)
+- **Port**: 587 (STARTTLS) or 465 (SSL/TLS)
+- **Authentication**: Basic Auth
+- **Username**: Value from `SMTP_RELAY_USERNAME`
+- **Password**: Value from `SMTP_RELAY_PASSWORD`
+- **TLS/SSL**: Enabled in production, optional in development
 
-### Ver logs en tiempo real
+### Testing
+
+Test scripts are provided in the `test/` directory:
+
+#### Single Email Test
 ```bash
-docker-compose logs -f smtp-relay
+# Configure test/test_email.py with your settings
+cd test
+python3 test_email.py
 ```
 
-### Ver estado del servicio
+#### Bulk Email Test
 ```bash
-docker-compose ps
+# Configure test/test_mass_email.py with your settings
+cd test
+python3 test_mass_email.py
 ```
 
-### Health check
-```bash
-docker inspect smtp-relay-contpaq | grep -A 5 Health
-```
-
-### Archivos de log
-Los logs también se guardan en `./logs/smtp_relay.log` con rotación automática.
-
-## 🔒 Seguridad
-
-### Mejores prácticas implementadas:
-
-1. **Usuario no-root en contenedor**: El servicio se ejecuta con UID 1000
-2. **Variables de entorno**: Credenciales nunca en código
-3. **TLS/SSL**: Conexiones cifradas con Microsoft 365
-4. **Rate limiting**: Protección contra abuso
-5. **Validación de remitentes**: Lista blanca opcional
-6. **Logs de auditoría**: Todos los intentos de autenticación se registran
-
-### Recomendaciones adicionales:
-
-1. **Firewall**: Limitar acceso al puerto 587 solo desde la IP de Contpaq
-   ```bash
-   # Ejemplo con ufw
-   ufw allow from 192.168.1.100 to any port 587
-   ```
-
-2. **Reverse proxy**: Considerar usar nginx/traefik para SSL termination
-
-3. **Rotación de secrets**: Cambiar `SMTP_RELAY_PASSWORD` periódicamente
-
-4. **Monitoreo**: Configurar alertas para intentos de autenticación fallidos
-
-## 🐛 Solución de Problemas
-
-### El servidor no inicia
+### Docker Commands
 
 ```bash
-# Ver logs detallados
-docker-compose logs smtp-relay
+# Start the service
+docker compose up -d
 
-# Verificar configuración
-docker-compose config
+# Stop the service
+docker compose down
+
+# View logs
+docker compose logs -f smtp-relay
+
+# Restart the service
+docker compose restart
+
+# Rebuild after code changes
+docker compose build --no-cache && docker compose up -d
 ```
 
-**Errores comunes:**
-- `Configuration error`: Verificar que todas las variables requeridas estén en `.env`
-- `OAuth2 authentication failed`: Verificar credenciales de Azure AD y permisos
+## Configuration Reference
 
-### Contpaq no puede conectar
+#### Microsoft Graph API Endpoints
+- `GRAPH_API_AUTHORITY_BASE`: OAuth2 authority base URL (default: `https://login.microsoftonline.com`)
+- `GRAPH_API_ENDPOINT`: Graph API endpoint base URL (default: `https://graph.microsoft.com/v1.0`)
+- `GRAPH_API_SCOPE`: OAuth2 scope for Graph API (default: `https://graph.microsoft.com/.default`)
 
-1. Verificar que el puerto 587 esté accesible:
-   ```bash
-   telnet tu-servidor.com 587
-   ```
 
-2. Verificar logs del relay:
-   ```bash
-   docker-compose logs -f | grep -i auth
-   ```
+#### Security
+- `ALLOWED_IPS`: IP whitelist (`*` for all, or comma-separated IPs)
+- `ALLOWED_SENDERS`: Email whitelist (`*` for all, or comma-separated emails)
 
-3. Probar conexión manual con openssl:
-   ```bash
-   openssl s_client -starttls smtp -connect tu-servidor.com:587
-   ```
+#### Logging & Performance
+- `LOG_LEVEL`: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+- `RATE_LIMIT_PER_MINUTE`: Maximum emails per minute per sender (default: 60)
 
-### Emails no se envían
 
-1. Verificar logs de Microsoft 365:
-   ```bash
-   docker-compose logs -f | grep -i "microsoft\|oauth"
-   ```
+## Monitoring
 
-2. Verificar permisos en Azure AD (Mail.Send debe estar granted)
+### Health Checks
 
-3. Verificar que la dirección de correo en `MS365_EMAIL_ADDRESS` existe y tiene buzón activo
-
-### Rate limiting activo
-
-Si ves errores de rate limit, ajustar en `.env`:
-```env
-RATE_LIMIT_PER_MINUTE=120
-```
-
-Y reiniciar:
+Docker health check verifies both SMTP ports are accessible:
 ```bash
-docker-compose restart
+docker compose ps
+# Look for "healthy" status
 ```
 
-## 🔄 Actualización
+### Log Files
 
+Logs are stored in `logs/smtp_relay.log`:
+- Rotating file handler (10MB max size)
+- 5 backup files retained
+- Structured format with timestamps
+
+View logs:
 ```bash
-# Detener servicio
-docker-compose down
+# Container logs
+docker compose logs -f smtp-relay
 
-# Actualizar código (si hay cambios)
-git pull  # o copiar nuevos archivos
+# Application log file
+tail -f logs/smtp_relay.log
 
-# Reconstruir
-docker-compose build
-
-# Reiniciar
-docker-compose up -d
+# Search for errors
+grep ERROR logs/smtp_relay.log
 ```
 
-## 📁 Estructura del Proyecto
+### Container Resources
 
-```
-smtp-relay/
-├── src/
-│   ├── __init__.py          # Paquete Python
-│   ├── main.py              # Punto de entrada
-│   ├── config.py            # Configuración
-│   ├── logger.py            # Sistema de logging
-│   ├── oauth.py             # Autenticación OAuth2
-│   └── relay.py             # Servidor SMTP relay
-├── logs/                    # Logs (creado automáticamente)
-├── token_cache/             # Caché de tokens OAuth2
-├── Dockerfile               # Imagen Docker
-├── docker-compose.yml       # Orquestación
-├── requirements.txt         # Dependencias Python
-├── .env.example             # Plantilla de configuración
-├── .env                     # Tu configuración (no en git)
-├── .gitignore              # Archivos ignorados
-└── README.md               # Esta documentación
+Modify docker-compose.yml to set resource limits:
+```yaml
+services:
+  smtp-relay:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
 ```
 
-## 🧪 Pruebas
+## License
 
-### Test manual con Python
+This project is licensed under the MIT License - see the [LICENSE.txt](LICENSE.txt) file for details.
 
-```python
-import smtplib
-from email.mime.text import MIMEText
 
-# Configuración
-smtp_server = "tu-servidor.com"
-smtp_port = 587
-username = "contpaq_smtp"  # SMTP_RELAY_USERNAME
-password = "TuPasswordSeguro123!"  # SMTP_RELAY_PASSWORD
+## Contributing
 
-# Crear mensaje
-msg = MIMEText("Este es un email de prueba desde el SMTP relay")
-msg['Subject'] = 'Test SMTP Relay'
-msg['From'] = 'nominas@tudominio.com'
-msg['To'] = 'destino@ejemplo.com'
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-# Enviar
-try:
-    server = smtplib.SMTP(smtp_server, smtp_port)
-    server.starttls()
-    server.login(username, password)
-    server.send_message(msg)
-    server.quit()
-    print("Email enviado exitosamente!")
-except Exception as e:
-    print(f"Error: {e}")
-```
 
-### Test con telnet
+## Changelog
 
-```bash
-telnet tu-servidor.com 587
-# Debería responder: 220 ... ESMTP
-
-EHLO test
-# Debería mostrar capacidades incluyendo STARTTLS y AUTH
-```
-
-## 📝 Mantenimiento
-
-### Backup de configuración
-
-```bash
-# Backup de .env
-cp .env .env.backup.$(date +%Y%m%d)
-
-# Backup de logs
-tar -czf logs-backup-$(date +%Y%m%d).tar.gz logs/
-```
-
-### Limpieza de logs antiguos
-
-```bash
-# Mantener solo últimos 7 días
-find logs/ -name "*.log" -mtime +7 -delete
-```
-
-### Renovación de Client Secret
-
-Cuando el client secret de Azure AD esté por expirar:
-
-1. Crear nuevo secret en Azure Portal
-2. Actualizar `MS365_CLIENT_SECRET` en `.env`
-3. Reiniciar servicio: `docker-compose restart`
-4. Verificar logs: `docker-compose logs -f`
-
-## 🤝 Soporte
-
-Para problemas o preguntas:
-
-1. Revisar los logs: `docker-compose logs -f`
-2. Verificar configuración: `cat .env` (sin compartir secrets)
-3. Consultar documentación de Microsoft 365: [Authenticate an IMAP, POP or SMTP connection using OAuth](https://learn.microsoft.com/en-us/exchange/client-developer/legacy-protocols/how-to-authenticate-an-imap-pop-smtp-application-by-using-oauth)
-
-## 📜 Licencia
-
-Este proyecto es de código abierto y está disponible bajo la licencia MIT.
-
-## ⚠️ Aviso Legal
-
-Este software se proporciona "tal cual", sin garantías de ningún tipo. Úsalo bajo tu propia responsabilidad y asegúrate de cumplir con las políticas de seguridad de tu organización.
+### Version 1.0.0
+- Initial release
+- Dual SMTP server support (ports 587 and 465)
+- Microsoft Graph API integration with OAuth2
+- Environment-based TLS configuration
+- Docker containerization
+- IP and sender whitelisting
+- Rate limiting
+- Health checks

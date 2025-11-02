@@ -17,20 +17,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY src/ ./src/
-COPY start.sh ./
+COPY scripts/start.sh ./
+COPY scripts/entrypoint.sh ./
 
-# Make start script executable
-RUN chmod +x start.sh
+# Make scripts executable
+RUN chmod +x start.sh entrypoint.sh
 
-# Create non-root user for security
-RUN useradd -m -u 1000 smtprelay
-
-# Create directories and set ownership
-RUN mkdir -p /app/logs /app/token_cache && \
-    chown -R smtprelay:smtprelay /app
-
-# Switch to non-root user
-USER smtprelay
+# Create directories (will be mounted from host)
+RUN mkdir -p /app/logs /app/token_cache /app/certs
 
 # Expose SMTP port
 EXPOSE 587
@@ -39,5 +33,6 @@ EXPOSE 587
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import socket; s=socket.socket(); s.settimeout(5); s.connect(('localhost', 587)); s.close()"
 
-# Run the application
+# Run the application via entrypoint
+ENTRYPOINT ["./entrypoint.sh"]
 CMD ["./start.sh"]
