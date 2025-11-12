@@ -15,9 +15,9 @@ from pathlib import Path
 # Configuration - ADJUST ACCORDING TO YOUR ENVIRONMENT
 SMTP_SERVER = "localhost"  # or the IP/domain of your server
 SMTP_PORT = 465 # Use 587 for development without TLS, 465 for production with SSL
-USE_TLS = True # Set to True if TLS is enabled on the server
-SMTP_USERNAME = "yourusername"  # SMTP_RELAY_USERNAME value
-SMTP_PASSWORD = "yourpassword"  # SMTP_RELAY_PASSWORD value
+USE_TLS = False # Set to True if TLS is enabled on the server
+SMTP_USERNAME = "yourusername"
+SMTP_PASSWORD = "yourpassword"
 
 # Test email
 FROM_EMAIL = "sender@example.com"

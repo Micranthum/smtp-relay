@@ -1,6 +1,7 @@
 """
 SMTP Relay Server Handler
 Accepts connections from basic auth and relays to Microsoft 365 via Graph API
+Uses Celery for asynchronous email processing with rate limiting
 """
 import base64
 import requests
@@ -19,7 +20,7 @@ from .logger import logger
 from .oauth import MS365OAuth
 
 class RateLimiter:
-    """Simple rate limiter for email sending"""
+    """Rate limiter for incoming email requests"""
     
     def __init__(self, max_per_minute):
         self.max_per_minute = max_per_minute
@@ -46,12 +47,19 @@ class RateLimiter:
 
 
 class SMTPRelayHandler:
-    """SMTP Relay handler that bridges basic auth to OAuth2"""
+    """SMTP Relay handler that bridges basic auth to OAuth2 via Celery task queue"""
     
-    def __init__(self):
+    def __init__(self, task_sender):
+        """
+        Initialize SMTP relay handler
+        
+        Args:
+            task_sender: Callable that sends tasks to queue
+        """
         self.oauth = MS365OAuth()
-        self.rate_limiter = RateLimiter(Config.RATE_LIMIT_PER_MINUTE)
+        self.rate_limiter = RateLimiter(Config.INCOMING_RATE_LIMIT_PER_MINUTE)
         self.authenticated_sessions = set()
+        self.task_sender = task_sender
         
     async def handle_RCPT(self, server, session, envelope, address, rcpt_options):
         """Handle RCPT TO command"""
@@ -75,173 +83,51 @@ class SMTPRelayHandler:
         return '250 OK'
     
     async def handle_DATA(self, server, session, envelope):
-        """Handle DATA command - relay email to Microsoft 365"""
+        """Handle DATA command - queue email for processing via Celery"""
         
         try:
             # Get client information
             peer = session.peer
             client_ip = peer[0] if peer else 'unknown'
             
-            # Rate limiting check
+            # Rate limiting check for incoming emails
             if not self.rate_limiter.is_allowed(envelope.mail_from):
-                logger.warning(f"Rate limit exceeded for {envelope.mail_from} from {client_ip}")
+                logger.warning(
+                    f"Incoming rate limit exceeded for {envelope.mail_from} "
+                    f"from {client_ip}"
+                )
                 return '451 4.7.1 Rate limit exceeded. Please try again later.'
             
             # Log email details
-            logger.info(f"Relaying email from {envelope.mail_from} to {envelope.rcpt_tos} (client: {client_ip})")
+            logger.info(
+                f"Queuing email from {envelope.mail_from} to {envelope.rcpt_tos} "
+                f"(client: {client_ip})"
+            )
             
-            # Send via Microsoft 365
-            self._send_via_ms365(envelope)
+            # Encode email content for serialization
+            content_b64 = base64.b64encode(envelope.content).decode('utf-8')
             
-            logger.info(f"Email successfully relayed to Microsoft 365")
+            # Prepare envelope data for task
+            envelope_data = {
+                'mail_from': envelope.mail_from,
+                'rcpt_tos': envelope.rcpt_tos,
+                'content': content_b64,
+                'client_ip': client_ip,
+            }
+            
+            # Queue task asynchronously
+            task = self.task_sender(envelope_data)
+            
+            logger.info(
+                f"Email queued successfully with task ID: {task.id} "
+                f"from {envelope.mail_from}"
+            )
+            
             return '250 Message accepted for delivery'
             
         except Exception as e:
-            logger.error(f"Error relaying email: {e}", exc_info=True)
+            logger.error(f"Error queuing email: {e}", exc_info=True)
             return f'451 Error processing message: {str(e)}'
-    
-    def _is_sender_allowed(self, sender):
-        """Check if sender is in allowed list (deprecated - use Config.is_sender_allowed)"""
-        return Config.is_sender_allowed(sender)
-    
-    def _send_via_ms365(self, envelope):
-        """Send email via Microsoft 365 using Graph API"""
-        
-        # Parse the email message
-        msg = BytesParser(policy=default).parsebytes(envelope.content)
-        
-        # Build the Graph API message payload
-        graph_message = self._build_graph_message(msg, envelope)
-        
-        # Get OAuth2 token
-        logger.debug("Acquiring OAuth2 token for Graph API...")
-        token = self.oauth.get_access_token()
-        
-        # Send via Graph API
-        logger.debug(f"Sending email via Graph API from {Config.MS365_EMAIL_ADDRESS}")
-        
-        graph_url = f"{self.oauth.graph_endpoint}/users/{Config.MS365_EMAIL_ADDRESS}/sendMail"
-        
-        headers = {
-            'Authorization': f'Bearer {token}',
-            'Content-Type': 'application/json'
-        }
-        
-        payload = {
-            'message': graph_message,
-            'saveToSentItems': 'true'
-        }
-        
-        logger.debug(f"Posting to: {graph_url}")
-        logger.debug(f"Headers: Authorization: Bearer [token], Content-Type: application/json")
-        logger.debug(f"Payload keys: {list(payload.keys())}")
-        
-        response = requests.post(graph_url, headers=headers, json=payload, timeout=30)
-        
-        logger.debug(f"Response status: {response.status_code}")
-        logger.debug(f"Response headers: {dict(response.headers)}")
-        
-        if response.status_code == 202:
-            logger.info(f"Email sent successfully via Graph API to {envelope.rcpt_tos}")
-        else:
-            error_msg = f"Graph API error: {response.status_code} - {response.text}"
-            logger.error(error_msg)
-            logger.error(f"Request was to: {graph_url}")
-            logger.error(f"Message had {len(envelope.rcpt_tos)} recipient(s)")
-            raise Exception(error_msg)
-    
-    def _build_graph_message(self, msg, envelope):
-        """Build Graph API message format from email message"""
-        
-        # Extract headers
-        subject = msg.get('Subject', 'No Subject')
-        
-        # Always use the configured MS365 email address as sender
-        # Ignore the MAIL FROM from the client (which is just the SMTP auth user)
-        from_email = Config.MS365_EMAIL_ADDRESS
-        from_name = Config.MS365_EMAIL_ADDRESS.split('@')[0]
-        
-        # Build recipient list
-        to_recipients = []
-        for recipient in envelope.rcpt_tos:
-            name, email = parseaddr(recipient)
-            to_recipients.append({
-                'emailAddress': {
-                    'address': email if email else recipient
-                }
-            })
-        
-        # Build message body
-        graph_msg = {
-            'subject': subject,
-            'from': {
-                'emailAddress': {
-                    'address': Config.MS365_EMAIL_ADDRESS
-                }
-            },
-            'toRecipients': to_recipients
-        }
-        
-        # Handle multipart or simple messages
-        if msg.is_multipart():
-            # Extract parts
-            html_body = None
-            text_body = None
-            attachments = []
-            
-            for part in msg.walk():
-                content_type = part.get_content_type()
-                content_disposition = str(part.get('Content-Disposition', ''))
-                
-                if content_type == 'text/plain' and 'attachment' not in content_disposition:
-                    text_body = part.get_content()
-                elif content_type == 'text/html' and 'attachment' not in content_disposition:
-                    html_body = part.get_content()
-                elif 'attachment' in content_disposition or part.get_filename():
-                    # Handle attachment
-                    filename = part.get_filename() or 'attachment'
-                    content = part.get_payload(decode=True)
-                    if content:
-                        attachments.append({
-                            '@odata.type': '#microsoft.graph.fileAttachment',
-                            'name': filename,
-                            'contentType': content_type,
-                            'contentBytes': base64.b64encode(content).decode('utf-8')
-                        })
-            
-            # Set body (prefer HTML, fallback to text)
-            if html_body:
-                graph_msg['body'] = {
-                    'contentType': 'HTML',
-                    'content': html_body
-                }
-            elif text_body:
-                graph_msg['body'] = {
-                    'contentType': 'Text',
-                    'content': text_body
-                }
-            
-            # Add attachments
-            if attachments:
-                graph_msg['attachments'] = attachments
-                logger.debug(f"Including {len(attachments)} attachment(s)")
-        else:
-            # Simple message
-            body = msg.get_content()
-            content_type = msg.get_content_type()
-            
-            if content_type == 'text/html':
-                graph_msg['body'] = {
-                    'contentType': 'HTML',
-                    'content': body
-                }
-            else:
-                graph_msg['body'] = {
-                    'contentType': 'Text',
-                    'content': body
-                }
-        
-        return graph_msg
 
 
 class AuthenticatedSMTPController(Controller):

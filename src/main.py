@@ -49,9 +49,12 @@ class SMTPRelayServer:
             else:
                 logger.warning("TLS is DISABLED - connections will NOT be encrypted!")
             
+            # Import task sender
+            from .tasks import send_email_via_graph
+            
             # Create handlers for both servers
-            handler_starttls = SMTPRelayHandler()
-            handler_ssl = SMTPRelayHandler()
+            handler_starttls = SMTPRelayHandler(task_sender=send_email_via_graph.delay)
+            handler_ssl = SMTPRelayHandler(task_sender=send_email_via_graph.delay)
             
             # Create STARTTLS controller (port 587)
             logger.info(f"Setting up STARTTLS server on port {Config.SMTP_STARTTLS_PORT}...")

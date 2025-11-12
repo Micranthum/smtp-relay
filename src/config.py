@@ -65,6 +65,22 @@ class Config:
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE = int(os.getenv('RATE_LIMIT_PER_MINUTE', '60'))
     
+    # Celery Configuration
+    CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://redis:6379/0')
+    CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://redis:6379/0')
+    
+    # Celery Task Configuration
+    CELERY_MAX_RETRIES = int(os.getenv('CELERY_MAX_RETRIES', '3'))
+    CELERY_RETRY_DELAY = int(os.getenv('CELERY_RETRY_DELAY', '60'))
+    
+    # Graph API Rate Limiting
+    # Microsoft Graph API limit: 30 emails per minute for Exchange Online
+    # Supports up to 4 concurrent requests
+    GRAPH_API_RATE_LIMIT_PER_MINUTE = int(os.getenv('GRAPH_API_RATE_LIMIT_PER_MINUTE', '30'))
+    
+    # Incoming email rate limiting
+    INCOMING_RATE_LIMIT_PER_MINUTE = int(os.getenv('INCOMING_RATE_LIMIT_PER_MINUTE', '60'))
+    
     @classmethod
     def validate(cls):
         """Validate required configuration"""

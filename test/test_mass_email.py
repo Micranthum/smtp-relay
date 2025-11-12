@@ -25,8 +25,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 # Configuration
 SMTP_SERVER = "localhost"
-SMTP_PORT_SSL = 465
-SMTP_PORT_STARTTLS = 587
+USE_TLS = False  # Set to False for development without TLS
 USERNAME = "yourusername"
 PASSWORD = "yourpassword"
 FROM_EMAIL = "sender@example.com"
@@ -209,15 +208,25 @@ def generate_test_email(index):
     return test_email, unique_id
 
 
-def send_single_email(email_number, use_ssl=True, timeout=30):
+def send_single_email(email_number, use_tls=True, port=None, timeout=30):
     """
     Send a single email
+    
+    Args:
+        email_number: Email sequence number
+        use_tls: Whether to use TLS/SSL
+        port: SMTP port to use (if None, auto-select: 465 for TLS, 587 for plain)
+        timeout: Connection timeout in seconds
     
     Returns:
         dict with sending result
     """
     start_time = time.time()
     to_email, unique_id = generate_test_email(email_number)
+    
+    # Auto-select port if not specified
+    if port is None:
+        port = 465 if use_tls else 587
     
     result = {
         'number': email_number,
@@ -303,14 +312,17 @@ def send_single_email(email_number, use_ssl=True, timeout=30):
         msg.attach(MIMEText(text_body, 'plain'))
         msg.attach(MIMEText(html_body, 'html'))
         
-        # Connect and send
-        port = SMTP_PORT_SSL if use_ssl else SMTP_PORT_STARTTLS
-        
-        if use_ssl:
+        # Connect and send based on TLS mode and port
+        if use_tls and port == 465:
+            # Implicit SSL/TLS (port 465)
             smtp = smtplib.SMTP_SSL(SMTP_SERVER, port, timeout=timeout)
-        else:
+        elif use_tls and port == 587:
+            # STARTTLS (port 587)
             smtp = smtplib.SMTP(SMTP_SERVER, port, timeout=timeout)
             smtp.starttls()
+        else:
+            # Plain SMTP without TLS (development mode)
+            smtp = smtplib.SMTP(SMTP_SERVER, port, timeout=timeout)
         
         smtp.login(USERNAME, PASSWORD)
         smtp.send_message(msg)
@@ -525,9 +537,11 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Usage examples:
-  %(prog)s --emails 100 --threads 5          # 100 emails, 5 concurrent
-  %(prog)s --emails 1000 --threads 10        # 1000 emails, 10 concurrent
-  %(prog)s --emails 50 --mode starttls       # Use STARTTLS instead of SSL
+  %(prog)s --emails 100 --threads 5                    # 100 emails, 5 concurrent
+  %(prog)s --emails 1000 --threads 10                  # 1000 emails, 10 concurrent
+  %(prog)s --emails 50 --no-tls --port 587             # Without TLS
+  %(prog)s --emails 200 --threads 5 --port 465         # SSL/TLS port 465
+  %(prog)s --emails 100 --threads 5 --port 587         # STARTTLS port 587
         """
     )
     
@@ -535,8 +549,10 @@ Usage examples:
                         help='Number of emails to send (default: 100)')
     parser.add_argument('--threads', type=int, default=5,
                         help='Concurrent connections (default: 5)')
-    parser.add_argument('--mode', choices=['ssl', 'starttls'], default='ssl',
-                        help='Connection mode (default: ssl)')
+    parser.add_argument('--port', type=int, default=None,
+                        help='SMTP port (default: 465 with TLS, 587 without TLS)')
+    parser.add_argument('--no-tls', action='store_true',
+                        help='Disable TLS/SSL (use plain SMTP)')
     parser.add_argument('--timeout', type=int, default=30,
                         help='Connection timeout in seconds (default: 30)')
     
@@ -544,8 +560,26 @@ Usage examples:
     
     # Configure statistics
     stats['total'] = args.emails
-    use_ssl = (args.mode == 'ssl')
-    port = SMTP_PORT_SSL if use_ssl else SMTP_PORT_STARTTLS
+    
+    # Use command line argument if provided, otherwise use config default
+    use_tls = USE_TLS if not args.no_tls else False
+    
+    # Determine port
+    if args.port:
+        port = args.port
+    else:
+        port = 465 if use_tls else 587
+    
+    # Determine connection mode description
+    if use_tls:
+        if port == 465:
+            mode_desc = "SSL/TLS (implicit, port 465)"
+        elif port == 587:
+            mode_desc = "STARTTLS (explicit, port 587)"
+        else:
+            mode_desc = f"TLS enabled (port {port})"
+    else:
+        mode_desc = f"Plain SMTP (no encryption, port {port})"
     
     # Print header
     print("\n" + "=" * 80)
@@ -553,13 +587,19 @@ Usage examples:
     print("=" * 80)
     print(f"\n{Colors.BOLD}Configuration:{Colors.RESET}")
     print(f"  Server: {SMTP_SERVER}:{port}")
-    print(f"  Mode: {args.mode.upper()}")
+    print(f"  Mode: {mode_desc}")
+    print(f"  TLS/SSL: {'Enabled' if use_tls else 'Disabled'}")
     print(f"  Emails to send: {args.emails}")
     print(f"  Concurrent connections: {args.threads}")
+    print(f"  Timeout: {args.timeout}s")
     print(f"  User: {USERNAME}")
     print(f"  Sender: {FROM_EMAIL}")
     print(f"\n{Colors.YELLOW}Emails will be sent to @mailinator.com addresses")
     print(f"You can verify receipt at https://www.mailinator.com{Colors.RESET}\n")
+    
+    if not use_tls:
+        print(f"{Colors.RED}WARNING: TLS is disabled. Connections will not be encrypted.{Colors.RESET}")
+        print(f"{Colors.RED}This should only be used in development environments.{Colors.RESET}\n")
     
     input(f"{Colors.BOLD}Press ENTER to start...{Colors.RESET} ")
     
@@ -570,7 +610,7 @@ Usage examples:
     # Send emails with ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=args.threads) as executor:
         futures = {
-            executor.submit(send_single_email, i, use_ssl, args.timeout): i 
+            executor.submit(send_single_email, i, use_tls, port, args.timeout): i 
             for i in range(1, args.emails + 1)
         }
         
