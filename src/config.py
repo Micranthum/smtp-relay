@@ -64,22 +64,18 @@ class Config:
     
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE = int(os.getenv('RATE_LIMIT_PER_MINUTE', '60'))
-    
-    # Celery Configuration
-    CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://redis:6379/0')
-    CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://redis:6379/0')
-    
-    # Celery Task Configuration
-    CELERY_MAX_RETRIES = int(os.getenv('CELERY_MAX_RETRIES', '3'))
-    CELERY_RETRY_DELAY = int(os.getenv('CELERY_RETRY_DELAY', '60'))
-    
-    # Graph API Rate Limiting
-    # Microsoft Graph API limit: 30 emails per minute for Exchange Online
-    # Supports up to 4 concurrent requests
-    GRAPH_API_RATE_LIMIT_PER_MINUTE = int(os.getenv('GRAPH_API_RATE_LIMIT_PER_MINUTE', '30'))
-    
-    # Incoming email rate limiting
-    INCOMING_RATE_LIMIT_PER_MINUTE = int(os.getenv('INCOMING_RATE_LIMIT_PER_MINUTE', '60'))
+
+    # Redis / RQ Job Queue
+    REDIS_URL = os.getenv('REDIS_URL', 'redis://redis:6379/0')
+    RQ_MAX_RETRIES = int(os.getenv('RQ_MAX_RETRIES', '3'))
+    RQ_RETRY_INTERVALS = [
+        int(x) for x in os.getenv('RQ_RETRY_INTERVALS', '60,300,900').split(',')
+    ]
+
+    # Prometheus Metrics HTTP Server
+    METRICS_PORT = int(os.getenv('METRICS_PORT', '8000'))
+    # PROMETHEUS_MULTIPROC_DIR is read directly from os.environ by prometheus_client
+    # at import time — set it as an env var before Python starts, not here.
     
     @classmethod
     def validate(cls):

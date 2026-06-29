@@ -11,5 +11,8 @@ chmod 600 /app/token_cache/*.json 2>/dev/null || true
 # Logs
 chmod 755 /app/logs 2>/dev/null || true
 
+# Prometheus multiprocess directory (shared between relay and worker)
+chmod 777 /tmp/prometheus_multiproc 2>/dev/null || true
+
 # Execute the main command
 exec "$@"

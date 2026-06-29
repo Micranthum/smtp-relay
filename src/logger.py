@@ -6,6 +6,26 @@ import colorlog
 from pathlib import Path
 from .config import Config
 
+
+class _TLSSetupExceptionFilter(logging.Filter):
+    """
+    Belt-and-suspenders filter on the 'mail.log' logger used by aiosmtpd.
+    Downgrades TLSSetupException records to DEBUG so scanner-bot probes
+    don't appear as ERROR tracebacks in production logs.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.exc_info and record.exc_info[0] is not None:
+            try:
+                from aiosmtpd.smtp import TLSSetupException
+                if issubclass(record.exc_info[0], TLSSetupException):
+                    record.levelno = logging.DEBUG
+                    record.levelname = 'DEBUG'
+            except ImportError:
+                pass
+        return True
+
+
 def setup_logging():
     """Setup logging with color output and file logging"""
     
@@ -54,3 +74,8 @@ def setup_logging():
 
 # Create global logger instance
 logger = setup_logging()
+
+# Install TLSSetupException filter on aiosmtpd's internal logger
+_aiosmtpd_logger = logging.getLogger('mail.log')
+if not any(isinstance(f, _TLSSetupExceptionFilter) for f in _aiosmtpd_logger.filters):
+    _aiosmtpd_logger.addFilter(_TLSSetupExceptionFilter())

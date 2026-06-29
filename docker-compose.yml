@@ -21,14 +21,17 @@ services:
     ports:
       - "${SMTP_STARTTLS_PORT:-587}:${SMTP_STARTTLS_PORT:-587}"
       - "${SMTP_SSL_PORT:-465}:${SMTP_SSL_PORT:-465}"
+      - "${METRICS_PORT:-8000}:${METRICS_PORT:-8000}"
     env_file:
       - .env
     volumes:
       - ./logs:/app/logs
       - ./token_cache:/app/token_cache
       - ./certs:/app/certs:ro
+      - prometheus-multiproc:/tmp/prometheus_multiproc
     environment:
       - TZ=America/Mexico_City
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
     networks:
       - smtp-network
     depends_on:
@@ -46,46 +49,20 @@ services:
       retries: 3
       start_period: 10s
 
-  celery-worker:
+  worker:
     build: .
-    container_name: smtp-relay-celery-worker
+    container_name: smtp-relay-worker
     restart: unless-stopped
-    command: /app/scripts/start_celery.sh
+    command: ["python", "-u", "-m", "src.worker"]
     env_file:
       - .env
     volumes:
       - ./logs:/app/logs
       - ./token_cache:/app/token_cache
+      - prometheus-multiproc:/tmp/prometheus_multiproc
     environment:
       - TZ=America/Mexico_City
-    networks:
-      - smtp-network
-    depends_on:
-      redis:
-        condition: service_healthy
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    healthcheck:
-      test: ["CMD-SHELL", "celery -A src.celery_app inspect ping -d celery@$$HOSTNAME"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-
-  flower:
-    build: .
-    container_name: smtp-relay-flower
-    restart: unless-stopped
-    command: celery -A src.celery_app flower --port=5555 --broker=${CELERY_BROKER_URL:-redis://redis:6379/0}
-    ports:
-      - "${FLOWER_PORT:-5555}:5555"
-    env_file:
-      - .env
-    environment:
-      - TZ=America/Mexico_City
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
     networks:
       - smtp-network
     depends_on:
@@ -103,3 +80,4 @@ networks:
 
 volumes:
   redis-data:
+  prometheus-multiproc:
