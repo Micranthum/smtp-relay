@@ -16,12 +16,12 @@ from pathlib import Path
 SMTP_SERVER = "localhost"  # or the IP/domain of your server
 SMTP_PORT = 465 # Use 587 for development without TLS, 465 for production with SSL
 USE_TLS = False # Set to True if TLS is enabled on the server
-SMTP_USERNAME = "yourusername"
-SMTP_PASSWORD = "yourpassword"
+SMTP_USERNAME = "yourusername"  # Replace with your SMTP username
+SMTP_PASSWORD = "yourpassword"  # Replace with your SMTP password
 
 # Test email
 FROM_EMAIL = "sender@example.com"
-TO_EMAIL = "nadeen37@2200freefonts.com"
+TO_EMAIL = "naideen37@2200freefonts.com"  
 SUBJECT = f"Test SMTP Relay with Attachment - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 
 # Test attachment files
