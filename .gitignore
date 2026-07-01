@@ -44,10 +44,6 @@ env/
 logs/
 *.log
 
-# Token cache
-token_cache/
-token_cache.json
-
 # IDE
 .vscode/
 .idea/

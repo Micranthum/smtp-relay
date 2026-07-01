@@ -60,7 +60,7 @@ SMTP client (port 587 STARTTLS / port 465 SSL)
         → RateLimiter (per-sender, sliding window)
         → Redis Queue "email"
             → RQ Worker (src/worker.py, separate process)
-                → MS365OAuth (MSAL token cache in token_cache/)
+                → MS365OAuth (MSAL, token cached in Redis)
                 → Graph API POST sendMail
                     → on_send_success / on_send_failure callbacks
 Prometheus HTTP (port 8000, /metrics)
@@ -72,7 +72,7 @@ Prometheus HTTP (port 8000, /metrics)
 - `smtp-relay` container: runs `src/main.py` (SMTP server + metrics HTTP server)
 - `worker` container: runs `python -m src.worker` (RQ worker, no HTTP listener)
 
-Both mount `./token_cache` and a shared `prometheus-multiproc` volume. Prometheus metrics are aggregated from both processes via `MultiProcessCollector` when `PROMETHEUS_MULTIPROC_DIR` is set.
+Both mount a shared `prometheus-multiproc` volume. Prometheus metrics are aggregated from both processes via `MultiProcessCollector` when `PROMETHEUS_MULTIPROC_DIR` is set.
 
 ## Module responsibilities
 
@@ -81,7 +81,7 @@ Both mount `./token_cache` and a shared `prometheus-multiproc` volume. Prometheu
 | `src/main.py` | Wires up two `aiosmtpd` controllers and the metrics server; handles signals |
 | `src/relay.py` | SMTP handlers (`SMTPRelayHandler`, auth, rate limiting, RQ enqueue) |
 | `src/worker.py` | RQ job function `send_email_job`, Graph API call, job callbacks, worker `main()` |
-| `src/oauth.py` | MSAL `ConfidentialClientApplication` wrapper; file-backed token cache |
+| `src/oauth.py` | MSAL `ConfidentialClientApplication` wrapper; token cached in Redis (`SETEX`, TTL-based) |
 | `src/config.py` | All env-var reads; `Config.validate()` called at startup by both processes |
 | `src/metrics.py` | Prometheus counter/histogram/gauge definitions; `start_metrics_server()` |
 | `src/logger.py` | Rotating file + console logger named `smtp_relay` |

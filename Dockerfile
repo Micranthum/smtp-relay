@@ -24,7 +24,7 @@ COPY scripts/ ./scripts/
 RUN chmod +x scripts/*.sh
 
 # Create directories (will be mounted from host)
-RUN mkdir -p /app/logs /app/token_cache /app/certs
+RUN mkdir -p /app/logs /app/certs
 
 # Expose SMTP ports
 EXPOSE 587 465

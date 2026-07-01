@@ -48,7 +48,6 @@ smtp-relay/
 ├── test/                         # Manual test scripts
 ├── certs/                        # TLS/SSL certificates (production)
 ├── logs/                         # Application logs
-├── token_cache/                  # OAuth2 token cache
 ├── docker-compose.yml            # Docker compose with all services
 ├── Dockerfile                    # Docker image definition
 └── requirements.txt               # Python dependencies
@@ -118,7 +117,7 @@ RQ worker entry point (`python -m src.worker`). Contains:
 - `main()`: starts the RQ worker with the delayed-retry scheduler
 
 #### src/oauth.py
-Microsoft 365 OAuth2 authentication manager (MSAL `ConfidentialClientApplication`). Handles token acquisition via client credentials flow and file-backed token caching in `token_cache/`.
+Microsoft 365 OAuth2 authentication manager (MSAL `ConfidentialClientApplication`). Handles token acquisition via client credentials flow, cached in Redis (TTL-based, shared across worker replicas) with a short-lived in-memory cache on top.
 
 #### src/config.py
 Centralized configuration management, reading all settings from environment variables:

@@ -26,7 +26,6 @@ services:
       - .env
     volumes:
       - ./logs:/app/logs
-      - ./token_cache:/app/token_cache
       - ./certs:/app/certs:ro
       - prometheus-multiproc:/tmp/prometheus_multiproc
     environment:
@@ -58,7 +57,6 @@ services:
       - .env
     volumes:
       - ./logs:/app/logs
-      - ./token_cache:/app/token_cache
       - prometheus-multiproc:/tmp/prometheus_multiproc
     environment:
       - TZ=America/Mexico_City
