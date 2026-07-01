@@ -59,8 +59,8 @@ class Config:
     # - '*' = Allow all senders (development)
     # - 'user1@domain.com,user2@domain.com' = Allow specific senders (production)
     
-    # Logging
-    LOG_LEVEL = os.getenv('LOG_LEVEL', 'DEBUG' if ENVIRONMENT == 'development' else 'INFO')
+    # Logging — tied to ENVIRONMENT, not independently configurable
+    LOG_LEVEL = 'INFO' if ENVIRONMENT == 'production' else 'DEBUG'
     
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE = int(os.getenv('RATE_LIMIT_PER_MINUTE', '60'))
@@ -120,8 +120,6 @@ class Config:
         
         # Production-specific validations
         if cls.ENVIRONMENT == 'production':
-            if cls.LOG_LEVEL == 'DEBUG':
-                errors.append("LOG_LEVEL should not be 'DEBUG' in production")
             # TLS is now always enabled in production, so this check is redundant but kept for clarity
             if not cls.SMTP_RELAY_USE_TLS:
                 errors.append("CRITICAL: TLS must be enabled in production mode (this should never happen)")

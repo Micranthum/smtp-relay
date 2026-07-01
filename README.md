@@ -207,7 +207,8 @@ ALLOWED_SENDERS=*
 
 # Environment
 ENVIRONMENT=production
-LOG_LEVEL=INFO
+# LOG_LEVEL is not set directly — it follows ENVIRONMENT (DEBUG in
+# development, INFO in production)
 ```
 
 ### 3. TLS Certificates (Production)
