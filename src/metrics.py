@@ -6,13 +6,16 @@ prometheus_client detects it at import time and writes per-process .db files
 to that directory. The HTTP server (relay process only) aggregates them via
 MultiProcessCollector. The RQ worker writes metrics to files but does not
 run an HTTP server.
+
+queue_depth is intentionally NOT a multiprocess Gauge — it is exposed via a
+custom Collector that reads the RQ queue count from Redis on each scrape,
+giving an accurate real-time value without per-process file accumulation.
 """
 import os
 import logging
 from prometheus_client import (
     Counter,
     Histogram,
-    Gauge,
     CollectorRegistry,
     REGISTRY,
     start_http_server,
@@ -29,42 +32,71 @@ _metrics_server_started = False
 
 emails_received = Counter(
     'smtp_relay_emails_received_total',
-    'Total emails accepted into queue',
+    'Emails accepted by the SMTP server and enqueued to RQ (before delivery attempt)',
     ['from_ip'],
 )
 
 emails_sent = Counter(
     'smtp_relay_emails_sent_total',
-    'Total emails successfully delivered to Graph API',
+    'Emails successfully delivered to Microsoft 365 via Graph API (HTTP 202)',
 )
 
 emails_failed = Counter(
     'smtp_relay_emails_failed_total',
-    'Total emails that failed after exhausting all retries',
+    'Emails permanently failed after exhausting all RQ retries; reason=exception class name',
     ['reason'],
 )
 
 emails_retried = Counter(
     'smtp_relay_emails_retried_total',
-    'Total retry attempts on Graph API failures',
+    'RQ retry attempts scheduled after a transient delivery failure',
 )
 
 graph_api_duration = Histogram(
     'smtp_relay_graph_api_duration_seconds',
-    'Graph API sendMail POST request duration',
+    'Round-trip duration of the Graph API POST /sendMail request',
     buckets=[0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0],
 )
 
 tls_failures = Counter(
     'smtp_relay_tls_failures_total',
-    'TLS handshake failures caused by scanner bot STARTTLS probes',
+    'TLS handshake failures (typically scanner/bot probes, not real clients)',
 )
 
-queue_depth = Gauge(
-    'smtp_relay_queue_depth',
-    'Number of email jobs currently queued in Redis',
-)
 
+# ---------------------------------------------------------------------------
+# Real-time queue depth — custom collector, reads Redis on each scrape
+# ---------------------------------------------------------------------------
+
+class _QueueDepthCollector:
+    """
+    Reads the RQ 'email' queue length from Redis on every Prometheus scrape.
+    Avoids multiprocess Gauge pitfalls (multiple processes writing the same
+    gauge get summed, giving wildly incorrect values).
+    """
+    def __init__(self, redis_url: str, queue_name: str):
+        self._redis_url = redis_url
+        self._queue_name = queue_name
+
+    def collect(self):
+        from redis import Redis
+        from rq import Queue
+        try:
+            conn = Redis.from_url(self._redis_url, socket_connect_timeout=1)
+            depth = float(Queue(self._queue_name, connection=conn).count)
+        except Exception:
+            depth = -1.0  # -1 signals Redis is unreachable at scrape time
+        g = GaugeMetricFamily(
+            'smtp_relay_queue_depth',
+            'Current number of email jobs waiting in the RQ queue (read from Redis at scrape time)',
+        )
+        g.add_metric([], depth)
+        yield g
+
+
+# ---------------------------------------------------------------------------
+# Metrics HTTP server
+# ---------------------------------------------------------------------------
 
 def start_metrics_server(port: int, redis_url: str, queue_name: str) -> None:
     """
@@ -94,5 +126,6 @@ def start_metrics_server(port: int, redis_url: str, queue_name: str) -> None:
         registry = REGISTRY
         logger.info('Prometheus: single-process mode (PROMETHEUS_MULTIPROC_DIR not set)')
 
+    registry.register(_QueueDepthCollector(redis_url, queue_name))
     start_http_server(port, registry=registry)
     logger.info(f'Prometheus metrics server started on :{port}/metrics')

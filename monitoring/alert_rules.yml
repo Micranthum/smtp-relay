@@ -1,0 +1,47 @@
+groups:
+  - name: smtp_relay_alerts
+    rules:
+      - alert: SMTPRelayEmailPermanentlyFailed
+        expr: increase(smtp_relay_emails_failed_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Correo(s) fallaron permanentemente tras agotar reintentos"
+          description: "{{ $value }} correo(s) fallaron de forma permanente en los últimos 5 minutos. Revisar logs del worker para la razón (label reason)."
+
+      - alert: SMTPRelayHighRetryRate
+        expr: increase(smtp_relay_emails_retried_total[15m]) > 5
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tasa alta de reintentos de envío"
+          description: "Más de 5 reintentos programados en los últimos 15 minutos, posible degradación de Graph API o de la red."
+
+      - alert: SMTPRelayQueueBacklog
+        expr: smtp_relay_queue_depth > 20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cola de correos acumulándose"
+          description: "La cola 'email' tiene {{ $value }} jobs pendientes desde hace más de 5 minutos. El worker podría estar caído o saturado."
+
+      - alert: SMTPRelayTargetDown
+        expr: up{job="smtp_relay"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "El endpoint de métricas del relay no responde"
+          description: "Prometheus no puede scrapear smtp-relay:8000/metrics desde hace más de 2 minutos. El proceso relay podría estar caído."
+
+      - alert: SMTPRelayRedisUnreachable
+        expr: smtp_relay_queue_depth == -1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis inaccesible desde el relay"
+          description: "El collector de queue_depth no puede conectar a Redis desde hace más de 2 minutos. Los correos podrían no estarse encolando/procesando."

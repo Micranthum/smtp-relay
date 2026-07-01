@@ -26,8 +26,8 @@ RUN chmod +x scripts/*.sh
 # Create directories (will be mounted from host)
 RUN mkdir -p /app/logs /app/token_cache /app/certs
 
-# Expose SMTP ports and Flower port
-EXPOSE 587 465 5555
+# Expose SMTP ports
+EXPOSE 587 465
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

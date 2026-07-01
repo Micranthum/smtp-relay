@@ -13,7 +13,7 @@ from rq import Queue
 from rq.job import Retry
 from .config import Config
 from .logger import logger
-from .metrics import emails_received, tls_failures, queue_depth
+from .metrics import emails_received, tls_failures
 from .worker import send_email_job, on_send_success, on_send_failure
 
 
@@ -84,7 +84,6 @@ class SMTPRelayHandler:
             )
 
             emails_received.labels(from_ip=client_ip).inc()
-            queue_depth.set(self._queue.count)
             logger.info(
                 f'Email queued as job {job.id} '
                 f'from {envelope.mail_from} to {envelope.rcpt_tos} '

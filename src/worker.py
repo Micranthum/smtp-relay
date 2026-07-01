@@ -12,6 +12,7 @@ from email.utils import parseaddr
 from redis import Redis
 from rq import Queue, Worker
 from rq.job import Retry, get_current_job
+from requests.exceptions import ConnectionError as RequestsConnectionError, Timeout
 
 from .config import Config
 from .logger import logger
@@ -31,7 +32,8 @@ def _get_oauth() -> MS365OAuth:
 
 
 # ---------------------------------------------------------------------------
-# RQ job callbacks
+# RQ job callbacks — run in the PARENT worker process, so Prometheus
+# multiprocess counters accumulate correctly (unlike the forked job child).
 # ---------------------------------------------------------------------------
 
 def on_send_success(job, connection, result, *args, **kwargs) -> None:
@@ -40,10 +42,41 @@ def on_send_success(job, connection, result, *args, **kwargs) -> None:
 
 
 def on_send_failure(job, connection, type, value, traceback, *args, **kwargs) -> None:
-    # In rq 1.x, on_failure is called only on final failure (no retries left).
+    # RQ 1.16 calls on_failure on EVERY failure, not just the final one.
+    # Check retries_left (still pre-decrement at this point) to distinguish.
     reason = type.__name__ if type else 'unknown'
-    emails_failed.labels(reason=reason).inc()
-    logger.error(f'Job {job.id}: email permanently failed ({reason}): {value}')
+    if job.retries_left:
+        # Will be retried — log as transient, don't count as permanent failure.
+        logger.warning(
+            f'Job {job.id}: transient failure ({reason}), '
+            f'{job.retries_left} retry(ies) left: {value}'
+        )
+    else:
+        # retries_left == 0 or None: no more retries, this is the final failure.
+        emails_failed.labels(reason=reason).inc()
+        logger.error(f'Job {job.id}: email permanently failed ({reason}): {value}')
+
+
+# ---------------------------------------------------------------------------
+# Custom worker — tracks retry attempts in the parent process where
+# Prometheus multiprocess metrics work reliably.
+# ---------------------------------------------------------------------------
+
+class SMTPRelayWorker(Worker):
+    def handle_job_failure(self, job, queue, started_job_registry=None, exc_string=''):
+        # retries_left is still > 0 here when a retry is about to be scheduled.
+        if job.retries_left and job.retries_left > 0:
+            emails_retried.inc()
+            logger.info(
+                f'Job {job.id}: scheduling retry '
+                f'({job.retries_left} attempt(s) left)'
+            )
+        super().handle_job_failure(
+            job,
+            queue,
+            started_job_registry=started_job_registry,
+            exc_string=exc_string,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -120,12 +153,6 @@ def send_email_job(content_b64: str, mail_from: str, rcpt_tos: list) -> dict:
 
     content_b64: base64.b64encode(envelope.content).decode('utf-8')
     """
-    job = get_current_job()
-    if job and job.retries_left is not None and job.retries_left < Config.RQ_MAX_RETRIES:
-        emails_retried.inc()
-        logger.info(f'Retrying email from {mail_from} to {rcpt_tos} '
-                    f'(retries_left={job.retries_left})')
-
     content_bytes = base64.b64decode(content_b64.encode('utf-8'))
     msg = BytesParser(policy=default).parsebytes(content_bytes)
     graph_message = _build_graph_message(msg, rcpt_tos)
@@ -143,7 +170,15 @@ def send_email_job(content_b64: str, mail_from: str, rcpt_tos: list) -> dict:
     logger.info(f'Sending email from {mail_from} to {rcpt_tos} via Graph API')
 
     t0 = time.monotonic()
-    response = requests.post(graph_url, headers=headers, json=payload, timeout=30)
+    try:
+        response = requests.post(graph_url, headers=headers, json=payload, timeout=30)
+    except (RequestsConnectionError, Timeout) as exc:
+        job = get_current_job()
+        retries_left = job.retries_left if job else 'unknown'
+        logger.warning(
+            f'Network error sending to {rcpt_tos} (retries_left={retries_left}): {exc}'
+        )
+        raise
     graph_api_duration.observe(time.monotonic() - t0)
 
     if response.status_code == 202:
@@ -151,7 +186,19 @@ def send_email_job(content_b64: str, mail_from: str, rcpt_tos: list) -> dict:
         return {'status': 'sent', 'recipients': rcpt_tos}
 
     error_msg = f'Graph API error {response.status_code}: {response.text[:200]}'
-    logger.error(error_msg)
+
+    if response.status_code in (400, 403):
+        # Permanent errors — exhaust retries so on_failure fires immediately.
+        job = get_current_job()
+        if job:
+            job.retries_left = 0
+            job.save()
+        logger.error(f'Permanent Graph API error, will not retry: {error_msg}')
+    else:
+        job = get_current_job()
+        retries_left = job.retries_left if job else 'unknown'
+        logger.warning(f'Transient Graph API error (retries_left={retries_left}): {error_msg}')
+
     raise Exception(error_msg)
 
 
@@ -176,12 +223,19 @@ def main() -> None:
     logger.info(f'Queue     : email')
     logger.info(f'Retries   : {Config.RQ_MAX_RETRIES} at {Config.RQ_RETRY_INTERVALS}s')
 
+    # Pre-register known failure reasons at 0 so Prometheus has a baseline
+    # sample before the first real failure — a Counter label that "appears"
+    # already at 1 (never having been 0) makes increase() blind to that
+    # first occurrence, since there's no prior sample to diff against.
+    for reason in ('Exception', 'ConnectionError', 'Timeout'):
+        emails_failed.labels(reason=reason)
+
     redis_conn = Redis.from_url(Config.REDIS_URL)
     queue = Queue('email', connection=redis_conn, default_timeout=120)
-    worker = Worker([queue], connection=redis_conn)
+    worker = SMTPRelayWorker([queue], connection=redis_conn)
 
     logger.info('Worker ready, waiting for jobs')
-    worker.work()
+    worker.work(with_scheduler=True)
 
 
 if __name__ == '__main__':

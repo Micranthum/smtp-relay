@@ -74,6 +74,41 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: smtp-relay-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION_TIME:-90d}
+      - --web.enable-lifecycle
+    ports:
+      - "127.0.0.1:9090:9090"
+    networks:
+      - smtp-network
+    depends_on:
+      - smtp-relay
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: smtp-relay-alertmanager
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./monitoring/render-alertmanager-config.sh:/etc/alertmanager/render-and-run.sh:ro
+      - alertmanager-data:/alertmanager
+    entrypoint: ["/bin/sh", "/etc/alertmanager/render-and-run.sh"]
+    ports:
+      - "127.0.0.1:9093:9093"
+    networks:
+      - smtp-network
+
 networks:
   smtp-network:
     driver: bridge
@@ -81,3 +116,5 @@ networks:
 volumes:
   redis-data:
   prometheus-multiproc:
+  prometheus-data:
+  alertmanager-data:
