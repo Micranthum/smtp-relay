@@ -61,6 +61,8 @@ services:
     environment:
       - TZ=America/Mexico_City
       - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
+    healthcheck:
+      disable: true
     networks:
       - smtp-network
     depends_on:
