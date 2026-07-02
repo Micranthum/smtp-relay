@@ -214,7 +214,7 @@ def main() -> None:
     if multiproc_dir:
         os.makedirs(multiproc_dir, exist_ok=True)
 
-    Config.validate()
+    Config.validate(check_tls=False)
 
     logger.info('=' * 60)
     logger.info('SMTP Relay Worker — RQ email delivery')

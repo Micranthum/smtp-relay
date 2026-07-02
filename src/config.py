@@ -78,8 +78,13 @@ class Config:
     # at import time — set it as an env var before Python starts, not here.
     
     @classmethod
-    def validate(cls):
-        """Validate required configuration"""
+    def validate(cls, check_tls: bool = True):
+        """Validate required configuration.
+
+        check_tls=False skips the TLS cert file checks — used by the worker
+        process, which never loads certs (it has no SMTP/TLS code at all;
+        only src/main.py's SMTP servers do) and doesn't mount ./certs.
+        """
         errors = []
         
         # Security warning if someone tries to disable TLS in production
@@ -107,7 +112,7 @@ class Config:
             errors.append("MS365_EMAIL_ADDRESS is required")
         
         # TLS Certificate validation (only required when TLS is enabled)
-        if cls.SMTP_RELAY_USE_TLS:
+        if check_tls and cls.SMTP_RELAY_USE_TLS:
             if not cls.TLS_CERT_FILE or not cls.TLS_KEY_FILE:
                 errors.append("TLS_CERT_FILE and TLS_KEY_FILE are required when SMTP_RELAY_USE_TLS is enabled")
             else:
