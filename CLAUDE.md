@@ -111,10 +111,14 @@ Both mount a shared `prometheus-multiproc` volume. Prometheus metrics are aggreg
 
 ## Monitoring stack (Prometheus + Alertmanager)
 
-`docker compose up -d` also starts `prometheus` (port `127.0.0.1:9090`, TSDB in
+`docker compose up -d` also starts `prometheus` (port `9090`, TSDB in
 the `prometheus-data` volume, retention via `PROMETHEUS_RETENTION_TIME`) and
-`alertmanager` (port `127.0.0.1:9093`). Both are localhost-only by design —
-access via SSH tunnel, not exposed publicly.
+`alertmanager` (port `9093`). Both are published on all interfaces (`0.0.0.0`),
+reachable from the LAN — neither has built-in authentication, so this relies
+entirely on the network perimeter/firewall to keep them off the public
+internet. If that's ever not sufficient, bind them back to `127.0.0.1` in
+`docker-compose.yml` and access via SSH tunnel, or put a reverse proxy with
+auth in front.
 
 Alertmanager has no native env-var substitution in its config file, so
 `monitoring/render-alertmanager-config.sh` (mounted as its entrypoint) writes

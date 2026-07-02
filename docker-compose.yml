@@ -88,7 +88,7 @@ services:
       - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION_TIME:-90d}
       - --web.enable-lifecycle
     ports:
-      - "127.0.0.1:9090:9090"
+      - "9092:9092"
     networks:
       - smtp-network
     depends_on:
@@ -105,7 +105,7 @@ services:
       - alertmanager-data:/alertmanager
     entrypoint: ["/bin/sh", "/etc/alertmanager/render-and-run.sh"]
     ports:
-      - "127.0.0.1:9093:9093"
+      - "9093:9093"
     networks:
       - smtp-network
 

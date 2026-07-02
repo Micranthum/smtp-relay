@@ -278,11 +278,13 @@ Emails are queued immediately and processed asynchronously by the RQ worker.
 
 ### Monitoring with Prometheus / Alertmanager
 
-Both bind to `127.0.0.1` only (access via SSH tunnel, not exposed publicly):
+Both are published on all interfaces, reachable from the LAN. Neither has
+built-in authentication — keeping them off the public internet is the
+firewall's job, not the app's:
 
 ```
-http://127.0.0.1:9090   # Prometheus — metrics, alert rule states, PromQL queries
-http://127.0.0.1:9093   # Alertmanager — active alerts, silences
+http://<server-ip>:9090   # Prometheus — metrics, alert rule states, PromQL queries
+http://<server-ip>:9093   # Alertmanager — active alerts, silences
 ```
 
 Alerts (permanent send failures, high retry rate, queue backlog, target/Redis down) are delivered to the configured Telegram chat.
