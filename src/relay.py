@@ -13,7 +13,7 @@ from rq import Queue
 from rq.job import Retry
 from .config import Config
 from .logger import logger
-from .metrics import emails_received, tls_failures
+from .metrics import emails_received, tls_failures, ip_rejected
 from .worker import send_email_job, on_send_success, on_send_failure
 
 
@@ -47,10 +47,6 @@ class SMTPRelayHandler:
     async def handle_RCPT(self, server, session, envelope, address, rcpt_options):
         peer = session.peer
         client_ip = peer[0] if peer else 'unknown'
-
-        if not Config.is_ip_allowed(client_ip):
-            logger.warning(f'Rejected connection from unauthorized IP: {client_ip}')
-            return '550 5.7.1 Connection from this IP address not allowed'
 
         if not Config.is_sender_allowed(envelope.mail_from):
             logger.warning(f'Rejected email from unauthorized sender: {envelope.mail_from} (IP: {client_ip})')
@@ -248,6 +244,38 @@ class AuthenticatedSMTP(SMTPServer):
     def __init__(self, handler, **kwargs):
         self.handler_instance = handler
         super().__init__(handler, **kwargs)
+
+    def connection_made(self, transport):
+        # Rechazo duro de IPs no autorizadas antes de cualquier diálogo SMTP
+        # (antes del saludo 220). No existe handle_CONNECT en aiosmtpd, y
+        # rechazar desde handle_EHLO no cierra la conexión — por eso se hace
+        # acá, al nivel del protocolo asyncio.
+        #
+        # aiosmtpd vuelve a invocar connection_made() tras un handshake
+        # STARTTLS exitoso (con el transporte SSL). La IP del peer no cambia,
+        # así que re-chequear es inofensivo para conexiones ya aceptadas —
+        # self.session ya existe en ese punto.
+        peer = transport.get_extra_info('peername')
+        client_ip = peer[0] if peer else 'unknown'
+
+        if not Config.is_ip_allowed(client_ip):
+            logger.warning(f'Rejected connection from unauthorized IP: {client_ip}')
+            ip_rejected.inc()
+            transport.close()
+            return
+
+        super().connection_made(transport)
+
+    def connection_lost(self, error=None):
+        # Si connection_made() rechazó la IP arriba, super().connection_made()
+        # nunca corrió, así que self.session/_timeout_handle/_handler_coroutine
+        # de aiosmtpd nunca se inicializaron. connection_lost() de aiosmtpd
+        # asume que sí (assert self.session is not None), así que sin este
+        # guard un cierre de transporte tras un rechazo terminaría en
+        # AssertionError en vez de cerrar limpio.
+        if self.session is None:
+            return
+        super().connection_lost(error)
 
 
 # Belt-and-suspenders: also suppress TLSSetupException in the aiosmtpd logger

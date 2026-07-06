@@ -91,7 +91,8 @@ Both mount a shared `prometheus-multiproc` volume. Prometheus metrics are aggreg
 
 ## Important behaviours
 
-- **Auth is handled in the controller, not the handler.** `AuthenticatedSMTPController` and `SSLSMTPController` both implement `_authenticate()` (duplicated). The `SMTPRelayHandler` itself has no auth logic — it only checks IP/sender whitelists and rate limits in `handle_RCPT`/`handle_DATA`.
+- **IP whitelist is enforced at connection time, before the SMTP greeting.** `AuthenticatedSMTP.connection_made()` (`src/relay.py`) checks `Config.is_ip_allowed()` against the peer address and, if disallowed, calls `transport.close()` immediately without ever calling aiosmtpd's own `connection_made()` — so the client never receives the `220` banner and cannot proceed to EHLO/STARTTLS/AUTH/MAIL/RCPT. Rejected connections increment `smtp_relay_ip_rejected_total`. `AuthenticatedSMTP.connection_lost()` is also overridden, to avoid crashing on aiosmtpd's internal asserts when a connection was rejected before aiosmtpd's own session state was initialized.
+- **Auth is handled in the controller, not the handler.** `AuthenticatedSMTPController` and `SSLSMTPController` both implement `_authenticate()` (duplicated). The `SMTPRelayHandler` itself has no auth logic — it only checks the sender whitelist and rate limits, in `handle_RCPT`/`handle_DATA` (the IP whitelist check has moved to the connection level; see above).
 - **Email content is base64-encoded for RQ transport.** `relay.py` encodes `envelope.content` before enqueue; `worker.py` decodes and parses with `BytesParser`.
 - **OAuth singleton per worker process.** `_oauth` in `worker.py` is a module-level singleton initialised lazily on the first job, reused for all subsequent jobs in the same process.
 - **TLS scanner noise is suppressed.** `handle_exception` in `SMTPRelayHandler` catches `TLSSetupException` at DEBUG level; a `logging.Filter` on `mail.log` also catches any that bypass it.
@@ -107,6 +108,7 @@ Both mount a shared `prometheus-multiproc` volume. Prometheus metrics are aggreg
 | `smtp_relay_emails_retried_total` | Counter | — |
 | `smtp_relay_graph_api_duration_seconds` | Histogram | — |
 | `smtp_relay_tls_failures_total` | Counter | — |
+| `smtp_relay_ip_rejected_total` | Counter | — |
 | `smtp_relay_queue_depth` | Gauge | — |
 
 ## Monitoring stack (Prometheus + Alertmanager)

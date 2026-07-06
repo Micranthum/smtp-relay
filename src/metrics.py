@@ -63,6 +63,12 @@ tls_failures = Counter(
     'TLS handshake failures (typically scanner/bot probes, not real clients)',
 )
 
+ip_rejected = Counter(
+    'smtp_relay_ip_rejected_total',
+    'Connections hard-rejected at connection_made() because the peer IP is not in ALLOWED_IPS '
+    '(closed before the 220 greeting, before any SMTP command is processed)',
+)
+
 
 # ---------------------------------------------------------------------------
 # Real-time queue depth — custom collector, reads Redis on each scrape
